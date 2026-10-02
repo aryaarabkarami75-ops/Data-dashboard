@@ -467,7 +467,7 @@ let charts = {};
 
 function loadSnapshot(src){
   return { clients: src.clients, rows: src.rows.map(r=>({date:r[0],client:r[1],source:r[2],campaign_id:r[3],campaign:r[4],metric:r[5],value:+r[6]||0,pub:r[7]||""})),
-           loadedAt: src.generated, live:false };
+           pubs: pubsFrom(src.pubs), loadedAt: src.generated, live:false };
 }
 let statusNote="";
 function setStatus(){
@@ -478,9 +478,13 @@ function setStatus(){
   t.textContent = statusNote || (DB.live ? "زنده از Google Sheets · "+hhmm : "نسخه ذخیره‌شده · "+jLong(DB.loadedAt.slice(0,10)));
 }
 function reportsFrom(rows){ if(!rows||!rows.length||String(rows[0][0]).trim()!=="client"||!rows[0].includes("html")) return []; return tableToObjects(rows); }
-function fromTable(dataRows, clientRows, at, reportRows){
+/* publishers tab: date, client, source, publisher, campaign, then one column per metric */
+function pubsFrom(rows){ if(!rows||!rows.length) return []; const h=rows[0].map(x=>String(x).trim()); if(h[0]!=="date"||!h.includes("publisher")) return [];
+  const out=[]; for(const r of rows.slice(1)){ const o={m:{}}; h.forEach((k,i)=>{const v=r[i]; if(["date","client","source","publisher","campaign"].includes(k)) o[k]=String(v??"").trim(); else if(k){const n=+String(v??"").replace(/,/g,""); if(n) o.m[k]=n;}});
+    if(o.date&&o.publisher) out.push(o); } return out; }
+function fromTable(dataRows, clientRows, at, reportRows, pubRows){
   const data=tableToObjects(dataRows), clients=clientRows&&clientRows.length?tableToObjects(clientRows):[];
-  return { clients, reports: reportsFrom(reportRows), rows: data.filter(r=>r.date&&r.metric).map(r=>({date:r.date,client:r.client,source:r.source,campaign_id:r.campaign_id,campaign:r.campaign,metric:r.metric,value:+String(r.value).replace(/,/g,"")||0,pub:(r.publisher||"").trim()})),
+  return { clients, reports: reportsFrom(reportRows), pubs: pubsFrom(pubRows), rows: data.filter(r=>r.date&&r.metric).map(r=>({date:r.date,client:r.client,source:r.source,campaign_id:r.campaign_id,campaign:r.campaign,metric:r.metric,value:+String(r.value).replace(/,/g,"")||0,pub:(r.publisher||"").trim()})),
            loadedAt: at||new Date().toISOString(), live:true };
 }
 /* inside claude.ai: read the sheet through the viewer's Google Sheets connector and keep it current */
@@ -498,7 +502,7 @@ function onSheet(part){
     if(ev.type==="data"){
       const v=ev.result.payload&&ev.result.payload.values; if(!Array.isArray(v)) return;
       live[part]=v; live.at=ev.result.cache?new Date(ev.result.cache.storedAt).toISOString():new Date().toISOString();
-      if(live.data){ DB=fromTable(live.data,live.clients,live.at,live.reports); statusNote=""; setStatus(); render(); }
+      if(live.data){ DB=fromTable(live.data,live.clients,live.at,live.reports,live.publishers); statusNote=""; setStatus(); render(); }
     } else {
       const code=ev.error&&ev.error.code;
       const deny=["needs_reauth","server_not_connected","blocked_by_policy","approval_required","not_in_manifest","selection_required"].includes(code);
@@ -516,6 +520,7 @@ async function startConnector(){
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"data!A1:I"},onSheet("data"),opts);
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"clients!A1:J"},onSheet("clients"),opts);
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"reports!A1:E"},onSheet("reports"),opts);
+  MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"publishers!A1:Z"},onSheet("publishers"),opts);
   return true;
 }
 /* outside claude.ai: the published CSV of the sheet (needs link sharing on) */
@@ -526,7 +531,7 @@ async function fetchSheet(tab){
   const text=await res.text(); if(/^\s*</.test(text)) throw new Error("not shared");
   return parseCSV(text);
 }
-async function loadCSV(){ const [d,c,r]=await Promise.all([fetchSheet("data"),fetchSheet("clients"),fetchSheet("reports").catch(()=>null)]); return fromTable(d,c,null,r); }
+async function loadCSV(){ const [d,c,r,p]=await Promise.all([fetchSheet("data"),fetchSheet("clients"),fetchSheet("reports").catch(()=>null),fetchSheet("publishers").catch(()=>null)]); return fromTable(d,c,null,r,p); }
 /* inside a Google Apps Script web app the page talks to the sheet through google.script.run */
 const GAS = !!(window.google&&google.script&&google.script.run);
 const gas = (fn,...a) => new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej({message:String(e&&e.message||e)}))[fn](...a));
@@ -813,8 +818,9 @@ function render(){
   if(S.page==="report") renderReportPage(info,recs,prevRecs,prev.length>0,span,from,to,M,brand);
   renderKPIs(info,M,recs,prevRecs,prev.length>0,span,from,to);
   if(S.view==="bar") renderBar(recs,colors); else if(S.view==="scatter") renderScatter(recs,colors,info); else renderTrend(recs,colors,from,to);
-  const hasPub=rowsAll.some(r=>r.pub); document.getElementById("pubDimBtn").hidden=!hasPub; if(!hasPub&&S.tableDim==="publisher") S.tableDim="campaign";
-  renderTable(recs,M,colors,idx);
+  const pubAll=(DB.pubs||[]).filter(p=>p.client===S.client);
+  const hasPub=pubAll.length>0; document.getElementById("pubDimBtn").hidden=!hasPub; if(!hasPub&&S.tableDim==="publisher") S.tableDim="campaign";
+  renderTable(S.tableDim==="publisher"?pubRecs(pubAll,from,to):recs,M,colors,idx);
   renderTargetsBox(info,M);
   document.getElementById("tLegend").hidden=!Object.keys(TARGETS).length;
   const unit=info.currency?` مبالغ به ${info.currency}.`:"";
@@ -982,6 +988,15 @@ function renderScatter(recs,colors,info){
       if(tl){const y=ch.scales.y.getPixelForValue(tl);ctx.strokeStyle=cssVar("--good");ctx.setLineDash([6,5]);ctx.beginPath();ctx.moveTo(ch.chartArea.left,y);ctx.lineTo(ch.chartArea.right,y);ctx.stroke();}
       ctx.restore();}}]});
 }
+/* one record per day and publisher: cost from the ad network's publisher report, installs/events from the tracker */
+function pubRecs(pubs,from,to){
+  const map=new Map();
+  for(const p of pubs){ if(p.date<from||p.date>to) continue; const k=p.date+"|"+p.publisher;
+    let o=map.get(k); if(!o){o={date:p.date,pub:p.publisher,ck:"",campaign:"",camps:new Set(),channel:"",m:{}};map.set(k,o);}
+    if(p.campaign) o.camps.add(p.campaign);
+    for(const m in p.m) o.m[m]=(o.m[m]||0)+p.m[m]; }
+  return [...map.values()];
+}
 function renderTable(recs,M,colors,idx){
   const dim=S.tableDim;
   const keyOf=r=>dim==="date"?r.date:dim==="source"?r.channel:dim==="publisher"?r.pub:r.ck;
@@ -991,16 +1006,16 @@ function renderTable(recs,M,colors,idx){
   const keys=[...new Set(recs.map(keyOf))];
   /* without cost per publisher, cost-based columns would all be blank, so they are left out */
   const cols=dim==="publisher"&&!pubCost?M.filter(m=>!isCostLike(m)&&!["ctr","clicks","impressions"].includes(m)):M;
-  let rows=keys.map(k=>{const sub=recs.filter(r=>keyOf(r)===k);const a=aggregate(sub);return {k,name:dim==="campaign"?sub[0].campaign:k,ch:sub[0].channel,camps:[...new Set(sub.map(r=>r.campaign))],vals:Object.fromEntries(cols.map(m=>[m,value(a,m)]))};});
+  let rows=keys.map(k=>{const sub=recs.filter(r=>keyOf(r)===k);const a=aggregate(sub);return {k,name:dim==="campaign"?sub[0].campaign:k,ch:sub[0].channel,camps:[...new Set(sub.flatMap(r=>r.camps?[...r.camps]:[r.campaign]).filter(Boolean))],vals:Object.fromEntries(cols.map(m=>[m,value(a,m)]))};});
   const sk=cols.includes(S.sortKey)||S.sortKey==="key"?S.sortKey:(cols.includes("cost")?"cost":cols[0]);
   rows.sort((a,b)=> sk==="key" ? (a.name<b.name?-1:1)*S.sortDir : ((a.vals[sk]??-Infinity)-(b.vals[sk]??-Infinity))*S.sortDir);
   const nameOf=r=>dim==="date"?jDow(r.k)+" "+jLong(r.k)+" "+r.k:dim==="source"?channelLabel(r.k):dim==="publisher"?r.k+" "+r.camps.join(" "):r.name+" "+channelLabel(r.ch);
   const total=rows.length;
   if(tblQuery) rows=rows.filter(r=>nameOf(r).toLowerCase().includes(tblQuery));
-  document.getElementById("tblCount").textContent=(tblQuery?`${fa(rows.length)} از ${fa(total)} سطر`:`${fa(total)} سطر`)+(dim==="publisher"&&!pubCost?" · هزینه به تفکیک پابلیشر هنوز در شیت نیست؛ فعلاً نصب و رویدادها نمایش داده می‌شوند":"");
+  document.getElementById("tblCount").textContent=(tblQuery?`${fa(rows.length)} از ${fa(total)} سطر`:`${fa(total)} سطر`)+(dim==="publisher"?(pubCost?" · همه کمپین‌ها و کانال‌ها؛ هزینه از گزارش پابلیشر یکتانت":" · هزینه به تفکیک پابلیشر هنوز در شیت نیست؛ فعلاً نصب و رویدادها نمایش داده می‌شوند"):"");
   const tot=aggregate(recs);
   const dimLabel={campaign:"کمپین",date:"روز",source:"کانال",publisher:"پابلیشر"}[dim];
-  const keyCell=r=> dim==="date"?`${jDow(r.k)} ${jLong(r.k)}`: dim==="source"?esc(channelLabel(r.k)):dim==="publisher"?`<span dir="ltr" class="pub" title="${esc(r.k)}">${esc(r.k)}</span><span class="tag">${r.camps.length===1?esc(r.camps[0]):fa(r.camps.length)+" کمپین"}</span>`:`<span class="sw" style="background:${colors.map[r.k]}"></span>${esc(r.name)}<span class="tag">${esc(channelLabel(r.ch))}</span>`;
+  const keyCell=r=> dim==="date"?`${jDow(r.k)} ${jLong(r.k)}`: dim==="source"?esc(channelLabel(r.k)):dim==="publisher"?`<span dir="ltr" class="pub" title="${esc(r.k)}">${esc(r.k)}</span>${r.camps.length?`<span class="tag">${r.camps.length===1?esc(r.camps[0]):fa(r.camps.length)+" کمپین"}</span>`:""}`:`<span class="sw" style="background:${colors.map[r.k]}"></span>${esc(r.name)}<span class="tag">${esc(channelLabel(r.ch))}</span>`;
   const grpStart=m=>m==="installs"||(!m.startsWith("cpa:")&&S.events.includes(m))||m==="clicks"||m==="impressions";
   const t=document.getElementById("table");
   if(!rows.length){t.innerHTML=`<tbody><tr><td class="empty">${tblQuery?"سطری با این جستجو پیدا نشد.":"برای این فیلترها داده‌ای نیست."}</td></tr></tbody>`;return;}
@@ -1253,6 +1268,24 @@ async function runImport(){
   document.getElementById("saveNote").textContent=canWrite()?"":"ذخیره در شیت فقط داخل claude.ai یا نسخه Google کار می‌کند.";
   document.getElementById("importSave").disabled=!canWrite();
 }
+async function savePublishers(client,dmin,dmax){
+  const note=document.getElementById("saveNote"); note.textContent="در حال ذخیره پابلیشرها…";
+  const got=await sheetGet("publishers!A1:Z");
+  let header=got.length&&got[0][0]==="date"?got[0].map(String):["date","client","source","publisher","campaign","cost","clicks","impressions","installs"];
+  const agg=new Map(), camp=new Map();
+  for(const o of IMP.result){ if(!o.pub) continue; const k=o.date+"\u0001"+o.pub;
+    let a=agg.get(k); if(!a){a={};agg.set(k,a);} a[o.metric]=(a[o.metric]||0)+o.v;
+    if(o.metric==="installs"){ let c=camp.get(k); if(!c){c={};camp.set(k,c);} c[o.camp]=(c[o.camp]||0)+o.v; }
+    if(!header.includes(o.metric)) header.push(o.metric); }
+  const kept=got.slice(1).filter(r=>!(r[1]===client&&r[2]==="adtrace"&&r[0]>=dmin&&r[0]<=dmax));
+  const add=[...agg].map(([k,a])=>{const [date,pub]=k.split("\u0001");const c=camp.get(k);const top=c?Object.entries(c).sort((x,y)=>y[1]-x[1])[0][0]:"";
+    return header.map(h=>h==="date"?date:h==="client"?client:h==="source"?"adtrace":h==="publisher"?pub:h==="campaign"?top:(a[h]||""));});
+  const all=[header,...kept,...add], W=header.length;
+  for(const r of all) while(r.length<W) r.push("");
+  while(all.length<got.length) all.push(Array(W).fill(""));
+  const col=String.fromCharCode(64+Math.min(W,26)), CH=2000;
+  for(let i=0;i<all.length;i+=CH) await sheetSet(`publishers!A${i+1}:${col}${Math.min(all.length,i+CH)}`,all.slice(i,i+CH));
+}
 async function saveImport(){
   const note=document.getElementById("saveNote"), btn=document.getElementById("importSave");
   if(!canWrite()||!IMP.result) return; btn.disabled=true; note.textContent="در حال ذخیره…";
@@ -1264,7 +1297,9 @@ async function saveImport(){
     if(vals[0].length<9) vals[0]=[...vals[0].slice(0,8),"publisher"];
     const header=vals[0], body=vals.slice(1);
     const kept=body.filter(r=>!(r[2]===client&&r[3]==="adtrace"&&r[0]>=dmin&&r[0]<=dmax));
-    const add=IMP.result.map(o=>{const [jy,jm,jd]=jParts(o.date);return [o.date,`${jy}-${pad(jm)}-${pad(jd)}`,client,"adtrace",o.net,o.camp,o.metric,o.v,o.pub||""];});
+    /* data tab: per campaign; publishers tab: per publisher (wide) */
+    const byCamp=new Map(); for(const o of IMP.result){const k=[o.date,o.net,o.camp,o.metric].join("\u0001"); byCamp.set(k,(byCamp.get(k)||0)+o.v);}
+    const add=[...byCamp].map(([k,v])=>{const [date,net,camp,metric]=k.split("\u0001");const [jy,jm,jd]=jParts(date);return [date,`${jy}-${pad(jm)}-${pad(jd)}`,client,"adtrace",net,camp,metric,v,""];});
     const all=[header,...kept,...add];
     for(const r of all) while(r.length<9) r.push("");
     while(all.length<vals.length) all.push(["","","","","","","","",""]);
@@ -1273,6 +1308,7 @@ async function saveImport(){
       note.textContent=`در حال ذخیره… ${fa(Math.min(100,(i+CH)/all.length*100),0)}٪`;
       await sheetSet(`data!A${i+1}:I${Math.min(all.length,i+CH)}`,all.slice(i,i+CH));
     }
+    if(IMP.result.some(o=>o.pub)) await savePublishers(client,dmin,dmax);
     const next=(await sheetGet("files!A1:A")).length+1;
     await sheetSet(`files!A${next}:H${next}`,[[new Date().toISOString().slice(0,16).replace("T"," "),client,"adtrace",IMP.file.name,"browser import",add.length,"ok",IMP.header.join(" | ").slice(0,4000)]]);
     note.textContent=`${fa(add.length)} ردیف خلاصه در شیت ذخیره شد.`;
@@ -1287,10 +1323,13 @@ async function saveImport(){
 /* marker comments built from pieces, so no slash-star or double slash appears inside strings or regexes */
 const CMT = n => "/"+"*"+n+"*"+"/";
 const MARK = n => new RegExp("\\/\\*"+n+"\\*\\/[\\s\\S]*?\\/\\*END\\*\\/");
+function pubsSnap(){ const ps=(DB.pubs||[]).filter(p=>p.client===S.client&&p.date>=S.from&&p.date<=S.to); if(!ps.length) return null;
+  const ms=[...new Set(ps.flatMap(p=>Object.keys(p.m)))], h=["date","client","source","publisher","campaign",...ms];
+  return [h,...ps.map(p=>[p.date,p.client,p.source,p.publisher,p.campaign,...ms.map(m=>p.m[m]||"")])]; }
 async function exportReport(){
   const info=clientInfo();
   const rows=DB.rows.filter(r=>r.client===S.client&&r.date>=S.from&&r.date<=S.to);
-  const snap={generated:new Date().toISOString(),clients:[info],rows:rows.map(r=>[r.date,r.client,r.source,r.campaign_id,r.campaign,r.metric,r.value,r.pub||""])};
+  const snap={generated:new Date().toISOString(),clients:[info],rows:rows.map(r=>[r.date,r.client,r.source,r.campaign_id,r.campaign,r.metric,r.value,r.pub||""]),pubs:pubsSnap()};
   const body=document.getElementById("repBody");
   const sv=savedReport(), narr=REP.key===repKey()&&body.innerHTML.trim()?cleanHtml(body.innerHTML):(sv?cleanHtml(sv.html):null);
   const rep={made:new Date().toISOString().slice(0,10),state:Object.assign({},S,{preset:0}),narr};
