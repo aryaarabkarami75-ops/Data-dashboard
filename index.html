@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head><meta charset="utf-8">
+<title>داشبورد عملکرد تبلیغات</title>
+<script>document.documentElement.lang="fa";document.documentElement.dir="rtl";
+window.onerror=function(msg,src,line){var s=document.getElementById("statusText");if(s)s.textContent="خطا: "+msg+(line?" (خط "+line+")":"");};</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: one working column. Header (client, data status, actions), filter bar with the
+   Jalali range calendar, a written summary, KPI tiles led by installs / CPI / CPA,
+   trend beside campaign ranking, then the blended campaign table. */
+:root{
+  --bg:#f5f5f2; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#7a7873;
+  --line:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10); --wash:#efeee9;
+  --accent:#1c5cab; --on-accent:#ffffff; --accent-wash:#e7eef8; --good:#006300; --bad:#b42f2f;
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7;--s8:#e34948;--other:#9a988f;
+  --font:"Vazirmatn",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#9a988f;
+  --line:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10); --wash:#242422;
+  --accent:#6da7ec; --on-accent:#0b0b0b; --accent-wash:#1c2a3d; --good:#0ca30c; --bad:#e66767;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;--other:#6f6d68;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#9a988f;
+  --line:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10); --wash:#242422;
+  --accent:#6da7ec; --on-accent:#0b0b0b; --accent-wash:#1c2a3d; --good:#0ca30c; --bad:#e66767;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;--other:#6f6d68;
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.6}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:grid;gap:16px}
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;justify-content:space-between}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{margin:0;font-size:22px;font-weight:800;text-wrap:balance}
+.brand .range{color:var(--ink-2);font-size:13px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);padding:4px 10px;border-radius:999px;border:1px solid var(--ring);background:var(--surface)}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.status.live i{background:var(--good)} .status.snap i{background:var(--s4)}
+button,select,input{font:inherit;color:inherit}
+.btn{border:1px solid var(--ring);background:var(--surface);padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:500}
+.btn:hover{background:var(--accent-wash)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:focus-visible,select:focus-visible,.chip:focus-visible,.kpi:focus-visible,.day:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.filters{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:end;background:var(--surface);border:1px solid var(--ring);border-radius:var(--r);padding:12px 14px}
+.field{display:grid;gap:4px;min-width:0}
+.field>label,.field>.lbl{font-size:11px;color:var(--muted);letter-spacing:.02em}
+select{background:var(--bg);border:1px solid var(--ring);border-radius:8px;padding:5px 8px;max-width:100%}
+.seg{display:inline-flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;background:var(--bg)}
+.seg button{border:0;background:transparent;padding:5px 10px;cursor:pointer;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+/* Jalali range calendar */
+.daterange{position:relative}
+.dr-btn{display:flex;align-items:center;gap:8px;border:1px solid var(--ring);background:var(--bg);border-radius:8px;padding:5px 12px;font-weight:600;cursor:pointer;font-size:13px}
+.dr-btn svg{width:15px;height:15px;opacity:.65}
+.cal-pop{position:absolute;top:calc(100% + 8px);inset-inline-start:0;background:var(--surface);border:1px solid var(--ring);border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:14px;width:min(300px,calc(100vw - 32px));z-index:50}
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-head button{border:0;background:var(--wash);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:15px}
+.cal-head b{font-size:13.5px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.cal-grid .dow{font-size:11px;color:var(--ink-2);padding:4px 0;font-weight:600}
+.day{font-size:12.5px;padding:6px 0;border-radius:8px;cursor:pointer;border:0;background:none}
+.day:hover{background:var(--accent-wash)}
+.day.has{font-weight:700}
+.day.in-range{background:var(--accent-wash)}
+.day.start,.day.end{background:var(--accent);color:var(--on-accent)}
+.day:disabled{color:var(--axis);cursor:not-allowed;background:none;font-weight:400}
+.cal-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px}
+.cal-foot span{font-size:11.5px;color:var(--ink-2)}
+.chips{display:grid;gap:6px}
+.chip-group{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.group-lbl{border:0;background:none;padding:0 0 0 4px;font-size:11px;color:var(--muted);cursor:pointer;min-width:7.5em;text-align:start}
+.group-lbl:hover{color:var(--accent)}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--ring);background:var(--bg);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;user-select:none}
+.chip .dot{width:9px;height:9px;border-radius:50%}
+.chip[aria-pressed="false"]{opacity:.45}
+.summary{background:var(--surface);border:1px solid var(--ring);border-radius:var(--r);padding:14px 16px;display:grid;gap:6px}
+.summary h2{margin:0;font-size:15px}
+.summary ul{margin:0;padding-inline-start:18px;display:grid;gap:4px;max-width:90ch}
+.summary li b{font-weight:700}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--ring);border-radius:var(--r);padding:12px 14px;display:grid;gap:2px;cursor:pointer;text-align:start}
+.kpi[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.kpi .k{font-size:12px;color:var(--ink-2)}
+.kpi .v{font-size:22px;font-weight:700;line-height:1.3}
+.kpi .v small{font-size:12px;font-weight:500;color:var(--muted)}
+.kpi .sub{font-size:13px;color:var(--ink);font-weight:600}
+.kpi .sub span{color:var(--ink-2);font-weight:400}
+.kpi .d{font-size:12px;color:var(--muted)}
+.good{color:var(--good)!important} .bad{color:var(--bad)!important}
+.grid2{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--ring);border-radius:var(--r);padding:14px;display:grid;gap:10px;min-width:0}
+.panel-head{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.panel h2{margin:0;font-size:15px;font-weight:700}
+.chart{position:relative;height:340px}
+.note{font-size:12px;color:var(--muted);margin:0}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:start;white-space:nowrap}
+th{font-size:12px;color:var(--ink-2);font-weight:500;cursor:pointer;position:sticky;top:0;background:var(--surface)}
+th.sorted{color:var(--ink);font-weight:700}
+th.grp{border-inline-start:1px solid var(--line)} td.grp{border-inline-start:1px solid var(--line)}
+td.num,th.num{text-align:end}
+td.key{font-weight:600}
+tfoot td{font-weight:700;border-top:1px solid var(--axis);border-bottom:0}
+.sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-inline-end:6px;vertical-align:middle}
+.tag{font-size:11px;color:var(--muted);font-weight:400;margin-inline-start:6px}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+/* importer */
+.importer{background:var(--surface);border:1px solid var(--accent);border-radius:var(--r);padding:14px 16px;display:grid;gap:12px}
+.importer h2{margin:0;font-size:15px}
+.map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.progress{height:6px;background:var(--wash);border-radius:3px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);width:0}
+.sample{font-size:12px}
+.targets{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;padding:10px 12px;background:var(--wash);border-radius:8px}
+.targets input{width:9em;background:var(--surface);border:1px solid var(--ring);border-radius:8px;padding:5px 8px;font-variant-numeric:tabular-nums;direction:ltr;text-align:right}
+th small{display:block;font-size:10.5px;color:var(--muted);font-weight:400}
+.legend-t{display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--ink-2)}
+.legend-t i{display:inline-block;width:46px;height:10px;border-radius:3px;background:linear-gradient(to left,color-mix(in srgb,var(--good) 45%,transparent),color-mix(in srgb,var(--good) 10%,transparent) 48%,color-mix(in srgb,var(--bad) 10%,transparent) 52%,color-mix(in srgb,var(--bad) 50%,transparent))}
+.report-only{display:none}
+body.report .no-report{display:none!important}
+body.report .report-only{display:block}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1 id="title">داشبورد عملکرد تبلیغات</h1>
+      <span class="range" id="rangeLabel"></span>
+    </div>
+    <div class="actions">
+      <span class="status" id="status"><i></i><span id="statusText">در حال بارگذاری…</span></span>
+      <button class="btn no-report" id="refreshBtn" type="button">به‌روزرسانی داده</button>
+      <button class="btn no-report" id="importBtn" type="button">وارد کردن خروجی ادتریس</button>
+      <button class="btn primary no-report" id="exportBtn" type="button">خروجی گزارش مشتری</button>
+    </div>
+  </header>
+
+  <p class="note report-only" id="reportNote"></p>
+
+  <section class="importer no-report" id="importer" hidden aria-label="وارد کردن خروجی ادتریس">
+    <div class="panel-head">
+      <h2>وارد کردن خروجی کامل ادتریس</h2>
+      <button class="btn" id="importClose" type="button">بستن</button>
+    </div>
+    <p class="note" style="font-size:13px;color:var(--ink-2)">فایل CSV خروجی ادتریس را از کامپیوتر خودتان انتخاب کنید (حجم مهم نیست). فایل همین‌جا در مرورگر خوانده می‌شود، نصب‌ها و رویدادها به تفکیک روز و کمپین جمع زده می‌شوند و فقط همین خلاصه در شیت ذخیره می‌شود.</p>
+    <div class="actions">
+      <input type="file" id="importFile" accept=".csv,text/csv">
+    </div>
+    <div id="importMap" hidden>
+      <div class="map-grid" id="mapGrid"></div>
+      <div class="tbl-wrap sample" id="sample"></div>
+      <div class="actions" style="margin-top:10px"><button class="btn primary" id="importRun" type="button">خواندن کل فایل</button></div>
+    </div>
+    <div id="importProgress" hidden><div class="progress"><i id="progBar"></i></div><p class="note" id="progText"></p></div>
+    <div id="importResult" hidden>
+      <div id="resultText"></div>
+      <div class="actions" style="margin-top:10px"><button class="btn primary" id="importSave" type="button">ذخیره در شیت و نمایش</button><span class="note" id="saveNote"></span></div>
+    </div>
+  </section>
+
+  <section class="filters" aria-label="فیلترها">
+    <div class="field no-report">
+      <label for="clientSel">مشتری</label>
+      <select id="clientSel"></select>
+    </div>
+    <div class="field">
+      <span class="lbl">بازه</span>
+      <div class="actions">
+        <div class="daterange" id="daterange">
+          <button type="button" class="dr-btn" id="drBtn" aria-haspopup="dialog" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+            <span id="drLabel"></span>
+          </button>
+          <div class="cal-pop" id="calPop" role="dialog" aria-label="انتخاب بازه" hidden>
+            <div class="cal-head">
+              <button type="button" id="calPrev" aria-label="ماه قبل">›</button>
+              <b id="calLabel"></b>
+              <button type="button" id="calNext" aria-label="ماه بعد">‹</button>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+            <div class="cal-foot"><span id="calHint"></span><button class="btn primary" type="button" id="calDone">تایید</button></div>
+          </div>
+        </div>
+        <div class="seg" id="presetSeg" role="group" aria-label="بازه آماده">
+          <button type="button" data-days="7">۷ روز</button>
+          <button type="button" data-days="14">۱۴ روز</button>
+          <button type="button" data-days="30">۳۰ روز</button>
+          <button type="button" data-days="0">کل</button>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label for="sourceSel">کانال</label>
+      <select id="sourceSel"></select>
+    </div>
+    <div class="field" style="flex:1 1 280px" id="eventField">
+      <span class="lbl">رویدادهای مهم (برای CPA)</span>
+      <div class="chip-group" id="eventChips"></div>
+    </div>
+    <div class="field" style="flex:1 1 100%">
+      <span class="lbl">کمپین‌ها <button class="btn" id="allCamps" type="button" style="padding:0 8px;font-size:11px;margin-inline-start:6px">همه</button></span>
+      <div class="chips" id="campChips"></div>
+    </div>
+  </section>
+
+  <section class="summary" id="summary" aria-label="خلاصه"></section>
+
+  <section class="kpis" id="kpis" aria-label="شاخص‌های اصلی"></section>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="panel-head">
+        <h2 id="trendTitle">روند</h2>
+        <div class="actions">
+          <select id="trendMetric" aria-label="شاخص نمودار روند"></select>
+          <div class="seg" id="splitSeg" role="group" aria-label="تفکیک">
+            <button type="button" data-split="total">کل</button>
+            <button type="button" data-split="campaign">کمپین</button>
+            <button type="button" data-split="source">کانال</button>
+          </div>
+          <div class="seg" id="granSeg" role="group" aria-label="بازه زمانی نمودار">
+            <button type="button" data-gran="day">روزانه</button>
+            <button type="button" data-gran="week">هفتگی</button>
+          </div>
+        </div>
+      </div>
+      <div class="chart"><canvas id="trendChart"></canvas></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head">
+        <h2 id="barTitle">کمپین‌ها</h2>
+        <select id="barMetric" aria-label="شاخص نمودار کمپین‌ها"></select>
+      </div>
+      <div class="chart" id="barBox"><canvas id="barChart"></canvas></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>جدول ترکیبی (هزینه شبکه تبلیغاتی + نصب و رویداد ترکر)</h2>
+      <div class="actions">
+      <span class="legend-t" id="tLegend" hidden>بهتر از هدف <i></i> بدتر از هدف</span>
+      <button class="btn no-report" id="targetsBtn" type="button" aria-expanded="false">هدف‌ها (CPI / CPA)</button>
+      <div class="seg" id="tableSeg" role="group" aria-label="سطرهای جدول">
+        <button type="button" data-dim="campaign">کمپین</button>
+        <button type="button" data-dim="date">روز</button>
+        <button type="button" data-dim="source">کانال</button>
+      </div>
+      </div>
+    </div>
+    <div class="targets no-report" id="targetsBox" hidden></div>
+    <div class="tbl-wrap"><table id="table"></table></div>
+    <p class="note" id="footnote"></p>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+/* everything lives in its own scope so no name can clash with scripts the host page adds (Google Apps Script adds its own) */
+(function(){
+/* ---------- config & data ---------- */
+const CONFIG = { sheetId: "1QXBsO_WV7xYOWlPR-C6o8nFULnhPNsCVM2xnEdevz2M" };
+const SNAPSHOT = /*SNAPSHOT*/null/*END*/;
+const REPORT = /*REPORT*/null/*END*/;
+const PAGE_SOURCE = document.documentElement.outerHTML;
+
+const LABELS = {
+  cost:"هزینه", impressions:"نمایش", clicks:"کلیک", installs:"نصب",
+  ctr:"CTR", cpc:"هزینه هر کلیک", "cpa:installs":"CPI"
+};
+const SOURCE_LABELS = { yektanet:"یکتانت", "yektanet-cafe":"یکتانت (کافه‌بازار)", adtrace:"ادتریس", appmetrica:"اپ‌متریکا", metrix:"متریکس" };
+const CORE = ["cost","impressions","clicks"];
+const NOT_EVENTS = new Set(["cost","impressions","clicks","installs"]);
+const SERIES = ["--s1","--s2","--s3","--s4","--s5","--s6","--s7","--s8"];
+const SHEETS="Google Sheets";
+
+/* ---------- helpers ---------- */
+const FA_D="۰۱۲۳۴۵۶۷۸۹";
+const faNum = s => String(s).replace(/\d/g,c=>FA_D[c]);
+const fa = (n, d=0) => (n==null||!isFinite(n)) ? "–" : n.toLocaleString("fa-IR",{maximumFractionDigits:d});
+const faPct = n => (n==null||!isFinite(n)) ? "–" : (n*100).toLocaleString("fa-IR",{maximumFractionDigits:2})+"٪";
+function compact(n){
+  if(n==null||!isFinite(n)) return "–";
+  const a=Math.abs(n);
+  if(a>=1e9) return fa(n/1e9,2)+" میلیارد";
+  if(a>=1e6) return fa(n/1e6,1)+" میلیون";
+  if(a>=1e5) return fa(n/1e3,0)+" هزار";
+  return fa(n, a<10?2:0);
+}
+function g2j(gy,gm,gd){var g=[0,31,59,90,120,151,181,212,243,273,304,334];var gy2=gm>2?gy+1:gy;var days=355666+365*gy+Math.floor((gy2+3)/4)-Math.floor((gy2+99)/100)+Math.floor((gy2+399)/400)+gd+g[gm-1];var jy=-1595+33*Math.floor(days/12053);days%=12053;jy+=4*Math.floor(days/1461);days%=1461;if(days>365){jy+=Math.floor((days-1)/365);days=(days-1)%365;}var jm,jd;if(days<186){jm=1+Math.floor(days/31);jd=1+days%31;}else{jm=7+Math.floor((days-186)/30);jd=1+(days-186)%30;}return[jy,jm,jd];}
+function j2g(jy,jm,jd){jy+=1595;var days=-355668+365*jy+Math.floor(jy/33)*8+Math.floor(((jy%33)+3)/4)+jd+(jm<7?(jm-1)*31:((jm-7)*30)+186);var gy=400*Math.floor(days/146097);days%=146097;if(days>36524){gy+=100*Math.floor(--days/36524);days%=36524;if(days>=365)days++;}gy+=4*Math.floor(days/1461);days%=1461;if(days>365){gy+=Math.floor((days-1)/365);days=(days-1)%365;}var gd=days+1;var sal=[0,31,((gy%4===0&&gy%100!==0)||gy%400===0)?29:28,31,30,31,30,31,31,30,31,30,31];var gm;for(gm=0;gm<13&&gd>sal[gm];gm++)gd-=sal[gm];return[gy,gm,gd];}
+const pad=n=>String(n).padStart(2,"0");
+const isoOf=(y,m,d)=>`${y}-${pad(m)}-${pad(d)}`;
+const jToIso=(jy,jm,jd)=>{const [y,m,d]=j2g(jy,jm,jd);return isoOf(y,m,d);};
+const J_MONTHS=["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
+const J_DOWS=["یکشنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنجشنبه","جمعه","شنبه"];
+const CAL_DOWS=["ش","ی","د","س","چ","پ","ج"];
+function jParts(iso){const [y,m,d]=iso.split("-").map(Number);return g2j(y,m,d);}
+function jShort(iso){const [,m,d]=jParts(iso);return fa(d)+" "+J_MONTHS[m-1];}
+function jLong(iso){const [y,m,d]=jParts(iso);return fa(d)+" "+J_MONTHS[m-1]+" "+faNum(y);}
+function jDow(iso){return J_DOWS[new Date(iso+"T12:00:00Z").getUTCDay()];}
+function jMonthLen(jy,jm){ if(jm<=6) return 31; if(jm<=11) return 30; return dayDiff(jToIso(jy,12,1),jToIso(jy+1,1,1)); }
+function addDays(iso,n){const t=new Date(iso+"T12:00:00Z");t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);}
+function dayDiff(a,b){return Math.round((new Date(b+"T12:00:00Z")-new Date(a+"T12:00:00Z"))/864e5);}
+const satIndex = iso => (new Date(iso+"T12:00:00Z").getUTCDay()+1)%7;   /* Persian week starts Saturday */
+const weekStart = iso => addDays(iso,-satIndex(iso));
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const store = { get(k,d){try{const v=localStorage.getItem("dash:"+k);return v?JSON.parse(v):d}catch(e){return d}},
+                set(k,v){try{localStorage.setItem("dash:"+k,JSON.stringify(v))}catch(e){}} };
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const normCamp = c => String(c||"").trim().toLowerCase().replace(/\s*\(\d+\)$/,"").replace(/\s+/g,"-");
+/* per-client name fixes from the clients tab, e.g. "inaap-26680=inapp-26680; old-name=new-name" */
+let ALIAS={}, TRACK_DATES=new Set();
+function setAliases(txt){ ALIAS={}; String(txt||"").split(/[;\n]/).forEach(p=>{const [a,b]=p.split("=");if(a&&b) ALIAS[normCamp(a)]=normCamp(b);}); }
+/* one real campaign split into several ad-network campaigns, each paying for one result, from the clients tab:
+   "winzy: install-win>installs, kyc-win>KYC" -> shown as one campaign "winzy"; CPI uses install-win's cost, CPA KYC uses kyc-win's cost */
+let GROUP={}, GROUP_NAME={}, PAYS={};
+function setGroups(txt){ GROUP={}; GROUP_NAME={}; PAYS={};
+  String(txt||"").split(/[;\n]/).forEach(g=>{ const i=g.indexOf(":"); if(i<0) return; const name=g.slice(0,i).trim(), gk=normCamp(name); if(!gk) return;
+    GROUP_NAME[gk]=name;
+    g.slice(i+1).split(",").forEach(m=>{ const [c,metric]=m.split(">").map(s=>s&&s.trim()); const ck=ALIAS[normCamp(c)]||normCamp(c); if(!ck) return;
+      GROUP[ck]=gk; if(metric) PAYS[ck]=metric==="installs"||/^installs?$/i.test(metric)?"installs":metric; }); }); }
+const memberKey = c => { const k=normCamp(c)||"(بدون نام)"; return ALIAS[k]||k; };
+const ckey = c => { const k=memberKey(c); return GROUP[k]||k; };
+
+function parseCSV(text){
+  const rows=[];let row=[],cell="",q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; } else cell+=c; }
+    else if(c==='"') q=true; else if(c===','){row.push(cell);cell="";}
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(cell);rows.push(row);row=[];cell=""; }
+    else cell+=c; }
+  if(cell!==""||row.length){row.push(cell);rows.push(row);}
+  return rows.filter(r=>r.length>1||r[0]!=="");
+}
+function tableToObjects(rows){const h=rows[0].map(s=>s.trim());return rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,(r[i]??"").trim()])));}
+
+/* ---------- state ---------- */
+let DB = null;
+const S = Object.assign({
+  client:null, from:null, to:null, preset:0, source:"", camps:null, events:null,
+  trendMetric:null, barMetric:null, split:"total", gran:"day", tableDim:"campaign", sortKey:"cost", sortDir:-1
+}, store.get("state2", {}));
+let charts = {};
+
+function loadSnapshot(src){
+  return { clients: src.clients, rows: src.rows.map(r=>({date:r[0],client:r[1],source:r[2],campaign_id:r[3],campaign:r[4],metric:r[5],value:+r[6]||0})),
+           loadedAt: src.generated, live:false };
+}
+let statusNote="";
+function setStatus(){
+  const el=document.getElementById("status"), t=document.getElementById("statusText");
+  el.className="status "+(DB.live?"live":"snap");
+  if(REPORT){ t.textContent="گزارش ثابت · "+jLong(DB.loadedAt.slice(0,10)); return; }
+  const hhmm=new Date(DB.loadedAt).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"});
+  t.textContent = statusNote || (DB.live ? "زنده از Google Sheets · "+hhmm : "نسخه ذخیره‌شده · "+jLong(DB.loadedAt.slice(0,10)));
+}
+function fromTable(dataRows, clientRows, at){
+  const data=tableToObjects(dataRows), clients=clientRows&&clientRows.length?tableToObjects(clientRows):[];
+  return { clients, rows: data.filter(r=>r.date&&r.metric).map(r=>({date:r.date,client:r.client,source:r.source,campaign_id:r.campaign_id,campaign:r.campaign,metric:r.metric,value:+String(r.value).replace(/,/g,"")||0})),
+           loadedAt: at||new Date().toISOString(), live:true };
+}
+/* inside claude.ai: read the sheet through the viewer's Google Sheets connector and keep it current */
+let MCP=null, live={data:null,clients:null,at:null};
+const ERR_COPY={
+  needs_reauth:"اتصال Google Sheets منقضی شده؛ در تنظیمات claude.ai دوباره وصل کنید",
+  server_not_connected:"Google Sheets وصل نیست؛ از تنظیمات claude.ai بخش Connectors وصلش کنید",
+  selection_required:"چند اتصال Google Sheets دارید؛ یکی را انتخاب کنید",
+  not_in_manifest:"اجازه دسترسی به شیت به این صفحه داده نشده",
+  blocked_by_policy:"دسترسی به شیت توسط سازمان بسته شده",
+  approval_required:"دسترسی به شیت نیاز به تأیید دارد",
+};
+function onSheet(part){
+  return ev=>{
+    if(ev.type==="data"){
+      const v=ev.result.payload&&ev.result.payload.values; if(!Array.isArray(v)) return;
+      live[part]=v; live.at=ev.result.cache?new Date(ev.result.cache.storedAt).toISOString():new Date().toISOString();
+      if(live.data){ DB=fromTable(live.data,live.clients,live.at); statusNote=""; setStatus(); render(); }
+    } else {
+      const code=ev.error&&ev.error.code;
+      const deny=["needs_reauth","server_not_connected","blocked_by_policy","approval_required","not_in_manifest","selection_required"].includes(code);
+      if(deny&&DB.live&&SNAPSHOT){ DB=loadSnapshot(SNAPSHOT); live={data:null,clients:null,at:null}; render(); }
+      statusNote=(ERR_COPY[code]||"شیت فعلاً در دسترس نیست")+(DB.live?"":" · نسخه ذخیره‌شده");
+      setStatus();
+    }
+  };
+}
+async function startConnector(){
+  if(!window.claude||!window.claude.use) return false;
+  MCP=await window.claude.use("mcp").catch(()=>null);
+  if(!MCP) return false;
+  const opts={refetchInterval:300000};
+  MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"data!A1:H"},onSheet("data"),opts);
+  MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"clients!A1:H"},onSheet("clients"),opts);
+  return true;
+}
+/* outside claude.ai: the published CSV of the sheet (needs link sharing on) */
+async function fetchSheet(tab){
+  /* no double slash inside template strings: Google Apps Script mistakes it for a comment and breaks the page */
+  const url="https:/"+"/docs.google.com/spreadsheets/d/"+CONFIG.sheetId+"/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(tab);
+  const res=await fetch(url,{cache:"no-store"}); if(!res.ok) throw new Error(res.status);
+  const text=await res.text(); if(/^\s*</.test(text)) throw new Error("not shared");
+  return parseCSV(text);
+}
+async function loadCSV(){ const [d,c]=await Promise.all([fetchSheet("data"),fetchSheet("clients")]); return fromTable(d,c); }
+/* inside a Google Apps Script web app the page talks to the sheet through google.script.run */
+const GAS = !!(window.google&&google.script&&google.script.run);
+const gas = (fn,...a) => new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej({message:String(e&&e.message||e)}))[fn](...a));
+async function loadGAS(){ const [d,c]=await Promise.all([gas("getValues","data!A1:H"),gas("getValues","clients!A1:H")]); return fromTable(d,c); }
+const canWrite = () => !!MCP||GAS;
+async function sheetGet(range){
+  if(MCP){ const r=await MCP.callTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range},{cache:false}); return (r.payload&&r.payload.values)||[]; }
+  if(GAS) return gas("getValues",range);
+  throw {message:"اتصال به شیت نیست"};
+}
+async function sheetSet(range,values){
+  if(MCP) return MCP.callTool(SHEETS,"update_values",{spreadsheetId:CONFIG.sheetId,range,values},{cache:false});
+  if(GAS) return gas("setValues",range,values);
+  throw {message:"اتصال به شیت نیست"};
+}
+async function reloadSheet(){
+  if(MCP){ try{ await MCP.invalidate(SHEETS,"get_values"); }catch(e){} return; }
+  if(GAS){ try{ DB=await loadGAS(); statusNote=""; }catch(e){ statusNote="شیت در دسترس نبود"; } setStatus(); render(); }
+}
+async function refresh(){
+  document.getElementById("statusText").textContent="در حال دریافت…";
+  if(MCP||GAS) return reloadSheet();
+  try{ DB=await loadCSV(); statusNote=""; }catch(e){ statusNote="شیت در دسترس نبود · نسخه ذخیره‌شده"; }
+  setStatus(); render();
+}
+async function boot(){
+  DB = SNAPSHOT ? loadSnapshot(SNAPSHOT) : {clients:[],rows:[],loadedAt:new Date().toISOString(),live:false};
+  if(REPORT){ Object.assign(S,REPORT.state); document.body.classList.add("report"); }
+  initControls(); setStatus(); render();
+  if(REPORT) return;
+  if(await startConnector()) return;
+  if(GAS){ await reloadSheet(); setInterval(reloadSheet,300000); return; }
+  try{ DB=await loadCSV(); statusNote=""; setStatus(); render(); }catch(e){}
+}
+
+/* ---------- model: blend ad-network cost with tracker installs/events by campaign ---------- */
+/* targets per client: "cpa:installs=40000; cpa:KYC=60000; ctr=0.02" in the clients tab (cpa_targets) */
+let TARGETS={};
+function parseTargets(txt){const o={};String(txt||"").split(/[;\n]/).forEach(p=>{const i=p.lastIndexOf("=");if(i<0)return;const k=p.slice(0,i).trim(),v=parseFloat(p.slice(i+1).replace(/[,٬]/g,"").replace(/[۰-۹]/g,d=>FA_D.indexOf(d)));if(k&&v>0)o[k]=v;});return o;}
+const serTargets=o=>Object.entries(o).map(([k,v])=>`${k}=${v}`).join("; ");
+const higherBetter = m => m==="ctr";
+/* how far a value is from its target: <1 better, >1 worse */
+function tRatio(m,v){const t=TARGETS[m]; if(!t||v==null||!isFinite(v)) return null; return higherBetter(m)? (v? t/v : Infinity) : v/t;}
+function tStyle(m,v){ const r=tRatio(m,v); if(r==null) return "";
+  if(r<=1){const p=Math.round(10+Math.min(1,(1-r)/0.5)*35); return `background:color-mix(in srgb,var(--good) ${p}%,transparent)`;}
+  const p=Math.round(10+Math.min(1,(r-1)/1)*40); return `background:color-mix(in srgb,var(--bad) ${p}%,transparent)`; }
+function targetKeys(M){ return M.filter(m=>m.startsWith("cpa:")||m==="cpc"||m==="ctr"); }
+function renderTargetsBox(info,M){
+  const box=document.getElementById("targetsBox"); if(box.hidden) return;
+  const keys=targetKeys(M);
+  box.innerHTML=keys.map(m=>`<div class="field"><label for="t_${esc(m)}">${esc(label(m))}${m==="ctr"?" (٪)":""}</label><input id="t_${esc(m)}" data-m="${esc(m)}" inputmode="decimal" placeholder="—" value="${TARGETS[m]?(m==="ctr"?+(TARGETS[m]*100).toFixed(3):TARGETS[m]):""}"></div>`).join("")
+    +`<div class="actions"><button class="btn primary" id="tSave" type="button">ذخیره هدف‌ها</button><span class="note" id="tNote">${canWrite()?"در شیت ذخیره می‌شود و در گزارش مشتری هم می‌آید.":"فقط در همین مرورگر ذخیره می‌شود."}</span></div>`;
+  box.querySelectorAll("input").forEach(inp=>inp.onchange=()=>{const m=inp.dataset.m;let v=parseFloat(inp.value.replace(/[,٬]/g,"").replace(/[۰-۹]/g,d=>FA_D.indexOf(d)));
+    if(m==="ctr"&&v>0) v=v/100; if(v>0) TARGETS[m]=v; else delete TARGETS[m];
+    store.set("targets:"+S.client,TARGETS); render();});
+  document.getElementById("tSave").onclick=()=>saveTargets(info);
+}
+async function saveTargets(info){
+  const note=document.getElementById("tNote"); const txt=serTargets(TARGETS);
+  info.cpa_targets=txt; store.set("targets:"+S.client,TARGETS);
+  if(!canWrite()){ note.textContent="در همین مرورگر ذخیره شد."; return; }
+  try{ note.textContent="در حال ذخیره…";
+    const col=(await sheetGet("clients!A1:A")).map(r=>r[0]); const i=col.indexOf(S.client);
+    if(i<1) throw {message:"مشتری در تب clients پیدا نشد"};
+    await sheetSet(`clients!E${i+1}`,[[txt]]);
+    note.textContent="در شیت ذخیره شد.";
+  }catch(e){ note.textContent=(e&&e.code&&ERR_COPY[e.code])||("ذخیره نشد"+(e&&e.message?": "+e.message:"")); }
+}
+function clientInfo(){return DB.clients.find(c=>c.client===S.client)||{client:S.client,display_name:S.client,currency:"",headline_metrics:""};}
+function clientRows(){return DB.rows.filter(r=>r.client===S.client);}
+const isTracker = src => src==="adtrace"||src==="appmetrica"||src==="metrix";
+/* one entry per campaign: display name and channel (the ad network that bills it, else the tracker's network) */
+function campaignIndex(rows){
+  const idx=new Map();
+  for(const r of rows){ const k=ckey(r.campaign);
+    let o=idx.get(k); if(!o){o={key:k,name:GROUP_NAME[k]||r.campaign||k,channel:null,net:null,cost:0};idx.set(k,o);}
+    if(!isTracker(r.source)){ o.channel=r.source; o.name=GROUP_NAME[k]||r.campaign; if(r.metric==="cost") o.cost+=r.value; }
+    else if(!o.net) o.net=r.campaign_id||r.source; }
+  for(const o of idx.values()) if(!o.channel) o.channel="net:"+(o.net||"ناشناخته");
+  return idx;
+}
+function channelLabel(ch){ if(ch.startsWith("net:")) return "بدون هزینه · "+ch.slice(4); return SOURCE_LABELS[ch]||ch; }
+function pivot(rows, idx){
+  const map=new Map();
+  for(const r of rows){ const ck=ckey(r.campaign), k=r.date+"|"+ck;
+    let o=map.get(k); if(!o){const c=idx.get(ck);o={date:r.date,ck,campaign:c?c.name:r.campaign,channel:c?c.channel:r.source,m:{}};map.set(k,o);}
+    o.m[r.metric]=(o.m[r.metric]||0)+r.value;
+    if(r.metric==="cost"){ const pay=PAYS[memberKey(r.campaign)]; if(pay) o.m["cost>"+pay]=(o.m["cost>"+pay]||0)+r.value; } }
+  return [...map.values()];
+}
+function aggregate(recs){
+  const s={}, ctrC={c:0,i:0}, cpcC={cost:0,c:0}; let costT=0; const costBy={};
+  for(const o of recs){ for(const k in o.m) s[k]=(s[k]||0)+o.m[k];
+    if(TRACK_DATES.has(o.date)){ costT+=o.m.cost||0; /* a grouped campaign pays for each earmarked result with only that member's cost */
+      for(const k in o.m) if(k.startsWith("cost>")) costBy[k.slice(5)]=(costBy[k.slice(5)]||0)+o.m[k]-(o.m.cost||0); }
+    if((o.m.impressions||0)>0){ctrC.c+=o.m.clicks||0;ctrC.i+=o.m.impressions;}
+    if("clicks" in o.m){cpcC.cost+=o.m.cost||0;cpcC.c+=o.m.clicks;} }
+  return {s,ctrC,cpcC,costT,costBy};
+}
+function value(agg,m){
+  const s=agg.s;
+  if(m==="ctr") return agg.ctrC.i? agg.ctrC.c/agg.ctrC.i : null;
+  if(m==="cpc") return agg.cpcC.c? agg.cpcC.cost/agg.cpcC.c : null;
+  /* CPI/CPA only count cost from days the tracker has data for, so a short tracker export does not inflate them */
+  if(m.startsWith("cpa:")){const ev=m.slice(4), e=s[ev], c=agg.costT+(agg.costBy[ev]||0); return e&&c?c/e:null;}
+  return (m in s) ? s[m] : null;
+}
+function label(m){
+  if(LABELS[m]) return LABELS[m];
+  if(m.startsWith("cpa:")) return "CPA "+label(m.slice(4));
+  return m;
+}
+const isCostLike = m => m==="cost"||m==="cpc"||m.startsWith("cpa:");
+const fmt = (m,v) => m==="ctr" ? faPct(v) : fa(v,0);
+const fmtShort = (m,v) => m==="ctr" ? faPct(v) : compact(v);
+function eventsOf(rows){
+  const tot={}; rows.forEach(r=>{ if(!NOT_EVENTS.has(r.metric)) tot[r.metric]=(tot[r.metric]||0)+r.value; });
+  return Object.keys(tot).sort((a,b)=>tot[b]-tot[a]);
+}
+function metricList(rows, events){
+  const base=new Set(rows.map(r=>r.metric));
+  const out=[];
+  if(base.has("cost")) out.push("cost");
+  if(base.has("installs")){ out.push("installs"); if(base.has("cost")) out.push("cpa:installs"); }
+  for(const e of events){ out.push(e); if(base.has("cost")) out.push("cpa:"+e); }
+  if(base.has("clicks")){ out.push("clicks"); if(base.has("cost")) out.push("cpc"); }
+  if(base.has("impressions")){ out.push("impressions"); if(base.has("clicks")) out.push("ctr"); }
+  return out;
+}
+function campaignColors(idx){
+  const order=[...idx.values()].sort((a,b)=>b.cost-a.cost||a.name.localeCompare(b.name)).map(o=>o.key);
+  const map={}; order.forEach((k,i)=>map[k]= i<SERIES.length? cssVar(SERIES[i]) : cssVar("--other"));
+  return {order,map};
+}
+
+/* ---------- Jalali range calendar ---------- */
+let cal={view:null, a:null, b:null, dates:new Set(), min:null, max:null};
+function openCal(){
+  cal.a=S.from; cal.b=S.to; const [jy,jm]=jParts(S.to); cal.view={jy,jm};
+  document.getElementById("calPop").hidden=false; document.getElementById("drBtn").setAttribute("aria-expanded","true"); renderCal();
+}
+function closeCal(){ document.getElementById("calPop").hidden=true; document.getElementById("drBtn").setAttribute("aria-expanded","false"); }
+function renderCal(){
+  const {jy,jm}=cal.view;
+  document.getElementById("calLabel").textContent=J_MONTHS[jm-1]+" "+faNum(jy);
+  const first=jToIso(jy,jm,1), len=jMonthLen(jy,jm), lead=satIndex(first);
+  let h=CAL_DOWS.map(d=>`<div class="dow">${d}</div>`).join("")+"<div></div>".repeat(lead);
+  for(let d=1; d<=len; d++){ const iso=jToIso(jy,jm,d);
+    const off=iso<cal.min||iso>cal.max;
+    const cls=["day"]; if(cal.dates.has(iso)) cls.push("has");
+    if(cal.a&&iso===cal.a) cls.push("start"); if(cal.b&&iso===cal.b) cls.push("end");
+    if(cal.a&&cal.b&&iso>cal.a&&iso<cal.b) cls.push("in-range");
+    h+=`<button type="button" class="${cls.join(" ")}" data-d="${iso}" ${off?"disabled":""}>${faNum(d)}</button>`; }
+  const g=document.getElementById("calGrid"); g.innerHTML=h;
+  g.querySelectorAll(".day:not(:disabled)").forEach(b=>b.onclick=()=>{ const d=b.dataset.d;
+    if(!cal.a||cal.b){cal.a=d;cal.b=null;} else if(d<cal.a){cal.b=cal.a;cal.a=d;} else cal.b=d; renderCal(); });
+  document.getElementById("calHint").textContent = cal.a&&!cal.b ? "روز پایان را انتخاب کنید" : "روز شروع را انتخاب کنید";
+}
+
+/* ---------- controls ---------- */
+function opt(v,t,sel){return `<option value="${esc(v)}"${sel?" selected":""}>${esc(t)}</option>`;}
+function initControls(){
+  const cs=document.getElementById("clientSel");
+  cs.onchange=()=>{S.client=cs.value;S.camps=null;S.source="";S.events=null;S.from=S.to=null;render();};
+  document.querySelectorAll("#presetSeg button").forEach(b=>b.onclick=()=>{S.preset=+b.dataset.days;S.from=S.to=null;render();});
+  document.getElementById("drBtn").onclick=e=>{e.stopPropagation(); document.getElementById("calPop").hidden?openCal():closeCal();};
+  document.getElementById("calPop").onclick=e=>e.stopPropagation();
+  document.getElementById("calPrev").onclick=()=>{let {jy,jm}=cal.view; jm--; if(jm<1){jm=12;jy--;} cal.view={jy,jm}; renderCal();};
+  document.getElementById("calNext").onclick=()=>{let {jy,jm}=cal.view; jm++; if(jm>12){jm=1;jy++;} cal.view={jy,jm}; renderCal();};
+  document.getElementById("calDone").onclick=()=>{ if(cal.a){S.from=cal.a;S.to=cal.b||cal.a;S.preset=-1;} closeCal(); render(); };
+  document.addEventListener("click",()=>{ if(!document.getElementById("calPop").hidden) closeCal(); });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeCal(); });
+  document.getElementById("sourceSel").onchange=e=>{S.source=e.target.value;render();};
+  document.getElementById("allCamps").onclick=()=>{S.camps=null;render();};
+  document.getElementById("trendMetric").onchange=e=>{S.trendMetric=e.target.value;render();};
+  document.getElementById("barMetric").onchange=e=>{S.barMetric=e.target.value;render();};
+  document.querySelectorAll("#splitSeg button").forEach(b=>b.onclick=()=>{S.split=b.dataset.split;render();});
+  document.querySelectorAll("#granSeg button").forEach(b=>b.onclick=()=>{S.gran=b.dataset.gran;render();});
+  document.querySelectorAll("#tableSeg button").forEach(b=>b.onclick=()=>{S.tableDim=b.dataset.dim;render();});
+  document.getElementById("refreshBtn").onclick=refresh;
+  document.getElementById("targetsBtn").onclick=e=>{const b=document.getElementById("targetsBox");b.hidden=!b.hidden;e.currentTarget.setAttribute("aria-expanded",String(!b.hidden));render();};
+  document.getElementById("exportBtn").onclick=exportReport;
+  document.getElementById("importBtn").onclick=()=>{const p=document.getElementById("importer");p.hidden=!p.hidden;};
+  document.getElementById("importClose").onclick=()=>{document.getElementById("importer").hidden=true;};
+  initImporter();
+  const mq=window.matchMedia("(prefers-color-scheme: dark)"); mq.addEventListener&&mq.addEventListener("change",()=>render());
+  new MutationObserver(()=>render()).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+}
+function pressed(sel,attr,val){document.querySelectorAll(sel+" button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset[attr]==String(val))));}
+
+/* ---------- render ---------- */
+function render(){
+  const clients=[...new Set(DB.rows.map(r=>r.client))];
+  if(!clients.includes(S.client)) S.client=clients[0]||null;
+  document.getElementById("clientSel").innerHTML=clients.map(c=>{const i=DB.clients.find(x=>x.client===c);return opt(c,(i&&i.display_name)||c,c===S.client)}).join("");
+  if(!S.client){document.getElementById("kpis").innerHTML='<div class="empty">هنوز داده‌ای در شیت نیست.</div>';return;}
+  const info=clientInfo(); TARGETS=Object.assign(parseTargets(info.cpa_targets),REPORT?{}:store.get("targets:"+S.client,{})); setAliases(info.campaign_aliases); setGroups(info.campaign_groups); const rowsAll=clientRows();
+  TRACK_DATES=new Set(rowsAll.filter(r=>isTracker(r.source)).map(r=>r.date));
+  const dates=[...new Set(rowsAll.map(r=>r.date))].sort();
+  const minD=dates[0], maxD=dates[dates.length-1];
+  if(!S.to||S.to>maxD||S.to<minD) S.to=maxD;
+  if(S.preset>0){ S.from=addDays(S.to,-(S.preset-1)); if(S.from<minD) S.from=minD; }
+  else if(S.preset===0||!S.from||S.from<minD||S.from>S.to) S.from=minD;
+  const from=S.from,to=S.to;
+  cal.dates=new Set(dates); cal.min=minD; cal.max=maxD;
+
+  document.getElementById("title").textContent="داشبورد "+(info.display_name||S.client);
+  document.getElementById("rangeLabel").textContent=jLong(from)+" تا "+jLong(to);
+  document.getElementById("drLabel").textContent=from===to?jLong(from):jShort(from)+" تا "+jLong(to);
+  pressed("#presetSeg","days",S.preset); pressed("#splitSeg","split",S.split); pressed("#granSeg","gran",S.gran); pressed("#tableSeg","dim",S.tableDim);
+
+  const idx=campaignIndex(rowsAll), colors=campaignColors(idx);
+  const channels=[...new Set([...idx.values()].map(o=>o.channel))].sort((a,b)=>(a.startsWith("net:")-b.startsWith("net:"))||a.localeCompare(b));
+  if(S.source&&!channels.includes(S.source)) S.source="";
+  document.getElementById("sourceSel").innerHTML=opt("","همه کانال‌ها",!S.source)+channels.map(c=>opt(c,channelLabel(c),c===S.source)).join("");
+
+  /* events: default to the four most frequent */
+  const events=eventsOf(rowsAll);
+  if(!S.events) S.events=(info.headline_metrics||"").split(",").map(s=>s.trim()).filter(e=>events.includes(e));
+  if(!S.events.length) S.events=events.slice(0,4);
+  S.events=S.events.filter(e=>events.includes(e));
+  document.getElementById("eventField").hidden=!events.length;
+  const ec=document.getElementById("eventChips");
+  ec.innerHTML=events.slice(0,30).map(e=>`<span class="chip" role="button" tabindex="0" data-e="${esc(e)}" aria-pressed="${S.events.includes(e)}">${esc(e)}</span>`).join("");
+  ec.querySelectorAll(".chip").forEach(ch=>{const fn=()=>{const e=ch.dataset.e; S.events=S.events.includes(e)?S.events.filter(x=>x!==e):[...S.events,e]; render();};
+    ch.onclick=fn; ch.onkeydown=k=>{if(k.key==="Enter"||k.key===" "){k.preventDefault();fn();}};});
+
+  /* campaign chips grouped by channel */
+  const inScope=colors.order.filter(k=>!S.source||idx.get(k).channel===S.source);
+  if(S.camps) S.camps=S.camps.filter(k=>inScope.includes(k)); if(S.camps&&!S.camps.length) S.camps=null;
+  const chip=k=>`<span class="chip" role="button" tabindex="0" data-c="${esc(k)}" aria-pressed="${!S.camps||S.camps.includes(k)}"><span class="dot" style="background:${colors.map[k]}"></span>${esc(idx.get(k).name)}</span>`;
+  const groups=channels.filter(c=>inScope.some(k=>idx.get(k).channel===c));
+  const chips=document.getElementById("campChips");
+  chips.innerHTML=groups.map(g=>`<div class="chip-group"><button type="button" class="group-lbl" data-g="${esc(g)}" title="فقط کمپین‌های این کانال">${esc(channelLabel(g))}</button>${inScope.filter(k=>idx.get(k).channel===g).map(chip).join("")}</div>`).join("");
+  chips.querySelectorAll(".group-lbl").forEach(b=>b.onclick=()=>{const only=inScope.filter(k=>idx.get(k).channel===b.dataset.g);
+    S.camps=(S.camps&&S.camps.length===only.length&&only.every(k=>S.camps.includes(k)))?null:only; render();});
+  chips.querySelectorAll(".chip").forEach(ch=>{const fn=()=>{const c=ch.dataset.c;let cur=S.camps?[...S.camps]:[...inScope];
+      cur=cur.includes(c)?cur.filter(x=>x!==c):[...cur,c]; S.camps=(cur.length===inScope.length||!cur.length)?null:cur; render();};
+    ch.onclick=fn; ch.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();fn();}};});
+
+  const keep=r=>{const k=ckey(r.campaign);return inScope.includes(k)&&(!S.camps||S.camps.includes(k));};
+  const cur=rowsAll.filter(r=>r.date>=from&&r.date<=to&&keep(r));
+  const span=dayDiff(from,to)+1, prevTo=addDays(from,-1), prevFrom=addDays(from,-span);
+  const prev=rowsAll.filter(r=>r.date>=prevFrom&&r.date<=prevTo&&keep(r));
+  const M=metricList(rowsAll,S.events);
+  const hasInstalls=M.includes("installs");
+  if(!M.includes(S.trendMetric)) S.trendMetric=hasInstalls?"cpa:installs":M[0];
+  if(!M.includes(S.barMetric)) S.barMetric=hasInstalls?"installs":M[0];
+  const mopts=sel=>M.map(m=>opt(m,label(m),m===sel)).join("");
+  document.getElementById("trendMetric").innerHTML=mopts(S.trendMetric);
+  document.getElementById("barMetric").innerHTML=mopts(S.barMetric);
+
+  const recs=pivot(cur,idx), prevRecs=pivot(prev,idx);
+  renderSummary(info,recs,idx,rowsAll);
+  renderKPIs(info,M,recs,prevRecs,prev.length>0,span);
+  renderTrend(recs,colors,from,to);
+  renderBar(recs,colors);
+  renderTable(recs,M,colors,idx);
+  renderTargetsBox(info,M);
+  document.getElementById("tLegend").hidden=!Object.keys(TARGETS).length;
+  const unit=info.currency?` مبالغ به ${info.currency}.`:"";
+  document.getElementById("footnote").textContent=`نصب و رویدادها از ترکر و هزینه از شبکه تبلیغاتی، با نام کمپین به هم وصل شده‌اند. CPI و CPA = هزینه ÷ تعداد، فقط روی روزهایی که داده ترکر دارند. CTR فقط روی ردیف‌هایی که نمایش دارند حساب می‌شود.${unit}`;
+  if(REPORT) document.getElementById("reportNote").textContent=`گزارش ${info.display_name||S.client} · ساخته‌شده در ${jLong(REPORT.made)}`;
+  store.set("state2",S);
+}
+
+function renderSummary(info,recs,idx,rowsAll){
+  const el=document.getElementById("summary");
+  const hasTracker=rowsAll.some(r=>isTracker(r.source));
+  const per=new Map();
+  for(const o of recs){ let p=per.get(o.ck); if(!p){p={name:o.campaign,channel:o.channel,recs:[]};per.set(o.ck,p);} p.recs.push(o); }
+  const camps=[...per.values()].map(p=>{const a=aggregate(p.recs);return {...p,cost:a.costT,inst:a.s.installs||0,a};});
+  const tot=aggregate(recs), cost=tot.s.cost||0, costT=tot.costT, inst=tot.s.installs||0;
+  const cur=info.currency||"";
+  const items=[];
+  items.push(`کل هزینه <b>${compact(cost)} ${esc(cur)}</b>`+(hasTracker?`، کل نصب <b>${fa(inst)}</b> و CPI کلی <b>${fa(value(tot,"cpa:installs"))}</b>.`:"."));
+  if(hasTracker&&costT<cost-1){ const td=[...TRACK_DATES].sort();
+    items.push(`داده ادتریس فقط از ${jLong(td[0])} تا ${jLong(td[td.length-1])} است؛ CPI و CPA فقط با هزینه همین روزها (${compact(costT)} ${esc(cur)}) حساب شده‌اند.`); }
+  if(!hasTracker){
+    items.push(`داده ترکر (ادتریس) هنوز وارد نشده، پس نصب، CPI و CPA نمایش داده نمی‌شوند. از دکمه «وارد کردن خروجی ادتریس» فایل را انتخاب کنید.`);
+  } else {
+    const paid=camps.filter(c=>c.cost>0);
+    const paidInst=paid.reduce((s,c)=>s+c.inst,0);
+    const freeInst=inst-paidInst;
+    if(inst) items.push(`<b>${fa(paidInst)}</b> نصب از کمپین‌های پولی و <b>${fa(freeInst)}</b> نصب (${faPct(freeInst/inst)}) از منابع بدون هزینه مثل ارگانیک.`);
+    const withInst=paid.filter(c=>c.inst>=Math.max(10,inst*0.01)).map(c=>({...c,cpi:value(c.a,"cpa:installs")})).sort((a,b)=>a.cpi-b.cpi);
+    if(withInst.length){ const b=withInst[0], w=withInst[withInst.length-1];
+      items.push(`ارزان‌ترین CPI: <b>${esc(b.name)}</b> با ${fa(b.cpi)} (${fa(b.inst)} نصب)`+(withInst.length>1?`؛ گران‌ترین: <b>${esc(w.name)}</b> با ${fa(w.cpi)} (${fa(w.inst)} نصب).`:"."));
+      const top=[...withInst].sort((a,b)=>b.inst-a.inst)[0];
+      items.push(`بیشترین نصب: <b>${esc(top.name)}</b> با ${fa(top.inst)} نصب، ${faPct(top.inst/(paidInst||1))} از نصب‌های پولی.`); }
+    const zero=paid.filter(c=>c.inst===0).sort((a,b)=>b.cost-a.cost);
+    if(zero.length){ const zc=zero.reduce((s,c)=>s+c.cost,0);
+      items.push(`<b>${fa(zero.length)}</b> کمپین با مجموع <b>${compact(zc)} ${esc(cur)}</b> هزینه، هیچ نصبی در ترکر ندارند: ${zero.slice(0,5).map(c=>esc(c.name)).join("، ")}${zero.length>5?" و …":""}. یا نام کمپین در ترکر فرق دارد یا نصبی نیاورده‌اند.`); }
+    for(const e of S.events.slice(0,2)){
+      const ce=paid.filter(c=>(c.a.s[e]||0)>0).map(c=>({...c,n:c.a.s[e],cpa:value(c.a,"cpa:"+e)})).sort((a,b)=>a.cpa-b.cpa);
+      if(ce.length) items.push(`رویداد «${esc(e)}»: مجموع ${fa(tot.s[e]||0)}، CPA کلی ${fa(value(tot,"cpa:"+e))}؛ بهترین کمپین <b>${esc(ce[0].name)}</b> با CPA ${fa(ce[0].cpa)}.`);
+    }
+  }
+  el.innerHTML=`<h2>خلاصه</h2><ul>${items.map(i=>`<li>${i}</li>`).join("")}</ul>`;
+}
+
+function deltaHtml(m,v,p,hasPrev,span){
+  if(!hasPrev||p==null||!p||v==null) return `<span class="d">بدون دوره قبل</span>`;
+  const ch=(v-p)/p, up=ch>=0;
+  const cls = m==="cost" ? "" : (isCostLike(m) ? (up?"bad":"good") : (up?"good":"bad"));
+  return `<span class="d ${cls}">${up?"▲":"▼"} ${faPct(Math.abs(ch))} نسبت به ${fa(span)} روز قبل</span>`;
+}
+function renderKPIs(info,M,recs,prevRecs,hasPrev,span){
+  const a=aggregate(recs), b=aggregate(prevRecs);
+  const unit=info.currency?` <small>${esc(info.currency)}</small>`:"";
+  const tiles=[];
+  if(M.includes("cost")) tiles.push({m:"cost",k:"هزینه"});
+  if(M.includes("installs")) tiles.push({m:"installs",k:"نصب",sub:"cpa:installs"});
+  for(const e of S.events) tiles.push({m:e,k:e,sub:M.includes("cpa:"+e)?"cpa:"+e:null});
+  if(M.includes("clicks")) tiles.push({m:"clicks",k:"کلیک",sub:M.includes("cpc")?"cpc":null});
+  if(M.includes("impressions")) tiles.push({m:"impressions",k:"نمایش",sub:M.includes("ctr")?"ctr":null});
+  document.getElementById("kpis").innerHTML=tiles.map(t=>{
+    const v=value(a,t.m);
+    const subV=t.sub?value(a,t.sub):null, subP=t.sub?value(b,t.sub):null;
+    let sub="";
+    if(t.sub){ let d=""; if(hasPrev&&subP&&subV!=null){const ch=(subV-subP)/subP,up=ch>=0;const cls=t.sub==="ctr"?(up?"good":"bad"):(up?"bad":"good");d=` <span class="${cls}">${up?"▲":"▼"}${faPct(Math.abs(ch))}</span>`;}
+      const r=tRatio(t.sub,subV), tg=r==null?"":` <span class="${r<=1?"good":"bad"}">(هدف ${fmt(t.sub,TARGETS[t.sub])})</span>`;
+      sub=`<span class="sub"><span>${esc(label(t.sub))}:</span> ${fmt(t.sub,subV)}${d}${tg}</span>`; }
+    const pressedM = S.trendMetric===t.m || S.trendMetric===t.sub;
+    return `<button type="button" class="kpi" data-m="${esc(t.sub||t.m)}" aria-pressed="${pressedM}"><span class="k">${esc(t.k)}</span><span class="v" title="${esc(fmt(t.m,v))}">${fmtShort(t.m,v)}${t.m==="cost"?unit:""}</span>${sub}${deltaHtml(t.m,v,value(b,t.m),hasPrev,span)}</button>`;
+  }).join("");
+  document.querySelectorAll("#kpis .kpi").forEach(k=>k.onclick=()=>{S.trendMetric=k.dataset.m;render();});
+}
+
+function chartBase(){ Chart.defaults.font.family=cssVar("--font"); Chart.defaults.color=cssVar("--muted"); }
+const bucketOf = d => S.gran==="week"?weekStart(d):d;
+function renderTrend(recs,colors,from,to){
+  if(!window.Chart) return;
+  chartBase(); const m=S.trendMetric;
+  const buckets=[]; for(let d=from; d<=to; d=addDays(d,1)){const k=bucketOf(d); if(!buckets.includes(k)) buckets.push(k);}
+  let groups;
+  if(S.split==="total") groups=[{name:"کل",color:cssVar("--s1"),f:()=>true}];
+  else if(S.split==="source"){const ss=[...new Set(recs.map(r=>r.channel))];groups=ss.map((s,i)=>({name:channelLabel(s),color:cssVar(SERIES[i%8]),f:r=>r.channel===s}));}
+  else { const present=colors.order.filter(k=>recs.some(r=>r.ck===k&&value(aggregate([r]),m)!=null));
+    const top=present.slice(0,7), rest=present.slice(7);
+    groups=top.map(k=>({name:recs.find(r=>r.ck===k).campaign,color:colors.map[k],f:r=>r.ck===k}));
+    if(rest.length) groups.push({name:"سایر",color:cssVar("--other"),f:r=>rest.includes(r.ck)}); }
+  const datasets=groups.map(g=>({label:g.name,borderColor:g.color,backgroundColor:g.color,
+    data:buckets.map(k=>{const sub=recs.filter(r=>bucketOf(r.date)===k&&g.f(r));return sub.length?value(aggregate(sub),m):null;}),
+    borderWidth:2,pointRadius:buckets.length>40?0:3,pointHoverRadius:5,tension:.25,spanGaps:true,
+    fill:S.split==="total"?{target:"origin",above:g.color+"1f"}:false}));
+  document.getElementById("trendTitle").textContent=`روند ${label(m)}`+(S.gran==="week"?" (هفتگی، از شنبه)":"");
+  charts.trend&&charts.trend.destroy();
+  charts.trend=new Chart(document.getElementById("trendChart"),{type:"line",
+    data:{labels:buckets.map(k=>S.gran==="week"?"هفته "+jShort(k):jShort(k)),datasets},
+    options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+      plugins:{legend:{display:datasets.length>1,position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},
+        tooltip:{rtl:true,textDirection:"rtl",callbacks:{title:it=>{const k=buckets[it[0].dataIndex];return S.gran==="week"?"هفته از "+jLong(k):jDow(k)+" "+jLong(k)},
+          label:c=>` ${c.dataset.label}: ${fmt(m,c.parsed.y)}`}}},
+      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:12}},
+        y:{beginAtZero:true,grid:{color:cssVar("--line")},border:{display:false},ticks:{callback:v=>fmtShort(m,v)}}}}});
+}
+function renderBar(recs,colors){
+  if(!window.Chart) return;
+  chartBase(); const m=S.barMetric;
+  const keys=colors.order.filter(k=>recs.some(r=>r.ck===k));
+  const vals=keys.map(k=>({k,name:recs.find(r=>r.ck===k).campaign,v:value(aggregate(recs.filter(r=>r.ck===k)),m)})).filter(x=>x.v!=null&&x.v!==0).sort((a,b)=>b.v-a.v).slice(0,25);
+  document.getElementById("barTitle").textContent=`${label(m)} به تفکیک کمپین`;
+  document.getElementById("barBox").style.height=Math.max(340,vals.length*26+50)+"px";
+  charts.bar&&charts.bar.destroy();
+  charts.bar=new Chart(document.getElementById("barChart"),{type:"bar",
+    data:{labels:vals.map(x=>x.name),datasets:[{data:vals.map(x=>x.v),backgroundColor:vals.map(x=>colors.map[x.k]),borderRadius:4,borderSkipped:"start",maxBarThickness:22}]},
+    options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{rtl:true,textDirection:"rtl",callbacks:{label:c=>` ${label(m)}: ${fmt(m,c.parsed.x)}`}}},
+      scales:{x:{beginAtZero:true,grid:{color:cssVar("--line")},border:{display:false},ticks:{callback:v=>fmtShort(m,v),maxTicksLimit:5}},
+        y:{grid:{display:false},ticks:{color:cssVar("--ink-2"),autoSkip:false}}}}});
+}
+function renderTable(recs,M,colors,idx){
+  const dim=S.tableDim;
+  const keyOf=r=>dim==="date"?r.date:dim==="source"?r.channel:r.ck;
+  const keys=[...new Set(recs.map(keyOf))];
+  const cols=M;
+  let rows=keys.map(k=>{const sub=recs.filter(r=>keyOf(r)===k);const a=aggregate(sub);return {k,name:dim==="campaign"?sub[0].campaign:k,ch:sub[0].channel,vals:Object.fromEntries(cols.map(m=>[m,value(a,m)]))};});
+  const sk=cols.includes(S.sortKey)||S.sortKey==="key"?S.sortKey:"cost";
+  rows.sort((a,b)=> sk==="key" ? (a.name<b.name?-1:1)*S.sortDir : ((a.vals[sk]??-Infinity)-(b.vals[sk]??-Infinity))*S.sortDir);
+  const tot=aggregate(recs);
+  const dimLabel={campaign:"کمپین",date:"روز",source:"کانال"}[dim];
+  const keyCell=r=> dim==="date"?`${jDow(r.k)} ${jLong(r.k)}`: dim==="source"?esc(channelLabel(r.k)):`<span class="sw" style="background:${colors.map[r.k]}"></span>${esc(r.name)}<span class="tag">${esc(channelLabel(r.ch))}</span>`;
+  const grpStart=m=>m==="installs"||(!m.startsWith("cpa:")&&S.events.includes(m))||m==="clicks"||m==="impressions";
+  const t=document.getElementById("table");
+  if(!rows.length){t.innerHTML='<tbody><tr><td class="empty">برای این فیلترها داده‌ای نیست.</td></tr></tbody>';return;}
+  t.innerHTML=`<thead><tr><th data-k="key" class="${sk==="key"?"sorted":""}">${dimLabel}</th>${cols.map(m=>`<th class="num ${m===sk?"sorted":""} ${grpStart(m)?"grp":""}" data-k="${esc(m)}">${esc(label(m))}${m===sk?(S.sortDir<0?" ▾":" ▴"):""}${TARGETS[m]?`<small>هدف ${fmt(m,TARGETS[m])}</small>`:""}</th>`).join("")}</tr></thead>
+  <tbody>${rows.map(r=>`<tr><td class="key">${keyCell(r)}</td>${cols.map(m=>`<td class="num ${grpStart(m)?"grp":""}" style="${tStyle(m,r.vals[m])}">${fmt(m,r.vals[m])}</td>`).join("")}</tr>`).join("")}</tbody>
+  <tfoot><tr><td>جمع</td>${cols.map(m=>`<td class="num ${grpStart(m)?"grp":""}" style="${tStyle(m,value(tot,m))}">${fmt(m,value(tot,m))}</td>`).join("")}</tr></tfoot>`;
+  t.querySelectorAll("th").forEach(th=>th.onclick=()=>{const k=th.dataset.k; if(S.sortKey===k) S.sortDir*=-1; else {S.sortKey=k;S.sortDir=k==="key"?1:-1;} render();});
+}
+
+/* ---------- Adtrace importer: aggregate a raw export in the browser, store only the summary ---------- */
+const IMP={file:null,header:null,headerLine:0,map:{},result:null,wide:null};
+/* Adtrace "Full Data Export" is already counted: one column per event (Installs, Register, KYC, ...) */
+const DIM_COL=/^(date|network|campaign|adgroup|creative|tracker|country|os|platform|store)(_token|_name)?$|token$/i;
+function wideCols(header){ const i=header.findIndex(h=>/^installs?$/i.test(h)); if(i<0) return null;
+  return header.map((h,j)=>[j,h]).filter(([j,h])=>h&&!DIM_COL.test(h)).map(([j,h])=>[j,/^installs?$/i.test(h)?"installs":h]); }
+const FIELDS=[
+  {id:"date",label:"ستون تاریخ/زمان",re:[/created.?at/i,/date\s*\/\s*time/i,/event.?time/i,/^time(stamp)?$/i,/installed.?at/i,/date/i,/time/i]},
+  {id:"kind",label:"ستون نوع فعالیت (نصب/رویداد)",re:[/activity.?kind/i,/activity.?type/i,/^kind$/i,/^type$/i,/activity/i],optional:true},
+  {id:"event",label:"ستون نام رویداد",re:[/event.?name/i,/^event$/i],optional:true},
+  {id:"campaign",label:"ستون کمپین",re:[/^campaign$/i,/campaign.?name/i,/utm.?campaign/i,/^tracker.?name$/i,/campaign(?!.*token)/i]},
+  {id:"network",label:"ستون شبکه",re:[/^network$/i,/network.?name/i,/utm.?source/i,/network(?!.*token)/i],optional:true},
+];
+function guess(header,f){ for(const re of f.re){ const i=header.findIndex(h=>re.test(h.trim())); if(i>=0) return i; } return -1; }
+function findHeader(rows){ for(let i=0;i<Math.min(rows.length,20);i++){ const r=rows[i]; if(r.length>=5&&r.some(c=>/campaign/i.test(c))) return i; } return 0; }
+function initImporter(){
+  const fileIn=document.getElementById("importFile");
+  fileIn.onchange=async()=>{
+    const f=fileIn.files[0]; if(!f) return; IMP.file=f;
+    document.getElementById("importResult").hidden=true;
+    const head=await f.slice(0,262144).text();
+    const rows=parseCSV(head.slice(0,head.lastIndexOf("\n")));
+    const hi=findHeader(rows); IMP.headerLine=hi; IMP.header=rows[hi].map(s=>s.trim()); IMP.wide=wideCols(IMP.header);
+    const g=document.getElementById("mapGrid");
+    g.innerHTML=FIELDS.filter(fd=>!(IMP.wide&&(fd.id==="kind"||fd.id==="event"))).map(fd=>{const gi=guess(IMP.header,fd);
+      return `<div class="field"><label for="map_${fd.id}">${fd.label}</label><select id="map_${fd.id}">${fd.optional?opt(-1,"— ندارد —",gi<0):""}${IMP.header.map((h,i)=>opt(i,h||("ستون "+(i+1)),i===gi)).join("")}</select></div>`;}).join("");
+    if(IMP.wide) g.insertAdjacentHTML("beforeend",`<p class="note" style="grid-column:1/-1">ستون‌های شمارش‌شده: ${IMP.wide.map(w=>esc(w[1])).join("، ")}</p>`);
+    const sample=rows.slice(hi+1,hi+6);
+    document.getElementById("sample").innerHTML=`<p class="note">${fa(IMP.header.length)} ستون. چند ردیف اول:</p><table><thead><tr>${IMP.header.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${sample.map(r=>`<tr>${IMP.header.map((h,i)=>`<td>${esc((r[i]||"").slice(0,40))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    document.getElementById("importMap").hidden=false;
+  };
+  document.getElementById("importRun").onclick=runImport;
+  document.getElementById("importSave").onclick=saveImport;
+}
+const TEH=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tehran",year:"numeric",month:"2-digit",day:"2-digit"});
+function toIsoDate(v){
+  v=String(v||"").trim(); if(!v) return null;
+  let m;
+  if(/^\d{10}(\.\d+)?$/.test(v)) return TEH.format(new Date(parseFloat(v)*1000));
+  if(/^\d{13}$/.test(v)) return TEH.format(new Date(+v));
+  if((m=v.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/))){
+    const y=+m[1]; if(y<1500) return jToIso(y,+m[2],+m[3]);
+    if(/[T ]\d{1,2}:\d{2}.*(Z|[+-]\d{2}:?\d{2})$/.test(v)){const d=new Date(v.replace(" ","T"));if(!isNaN(d)) return TEH.format(d);}
+    return isoOf(y,+m[2],+m[3]); }
+  if((m=v.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/))) return isoOf(+m[3],+m[2],+m[1]);
+  return null;
+}
+async function runImport(){
+  const map={}; FIELDS.forEach(f=>{const el=document.getElementById("map_"+f.id); map[f.id]=el?+el.value:-1;}); IMP.map=map;
+  if(map.date<0||map.campaign<0) return;
+  const prog=document.getElementById("importProgress"), bar=document.getElementById("progBar"), pt=document.getElementById("progText");
+  prog.hidden=false; document.getElementById("importResult").hidden=true;
+  const agg=new Map(), kinds={}; let n=0, used=0, bad=0, line=0;
+  let cell="", row=[], q=false;
+  const onRow=r=>{
+    line++; if(line<=IMP.headerLine+1) return;
+    if(r.length<2) return; n++;
+    if(IMP.wide){
+      if(r[0]&&r[0].trim()===IMP.header[0]) return;   /* repeated header */
+      const date=toIsoDate(r[map.date]); if(!date){bad++;return;}
+      const net=map.network>=0?String(r[map.network]||"").trim():"";
+      const camp=String(r[map.campaign]||"").trim()||net||"organic";
+      for(const [j,metric] of IMP.wide){ const v=parseFloat(r[j]); if(!v) continue;
+        const k=date+"\u0001"+net+"\u0001"+camp+"\u0001"+metric; agg.set(k,(agg.get(k)||0)+v); }
+      used++; kinds["رکورد شمارش‌شده"]=(kinds["رکورد شمارش‌شده"]||0)+1; return;
+    }
+    const kind=map.kind>=0?String(r[map.kind]||"").trim().toLowerCase():"";
+    const ev=map.event>=0?String(r[map.event]||"").trim():"";
+    kinds[kind||"—"]=(kinds[kind||"—"]||0)+1;
+    let metric=null;
+    if(map.kind>=0){ if(/install/.test(kind)&&!/re.?install|uninstall/.test(kind)) metric="installs"; else if(/event/.test(kind)&&ev) metric=ev; }
+    else metric = ev ? ev : "installs";
+    if(!metric) return;
+    if(NOT_EVENTS.has(metric)&&metric!=="installs") metric="event_"+metric;
+    const date=toIsoDate(r[map.date]); if(!date){bad++;return;}
+    const net=map.network>=0?String(r[map.network]||"").trim():"";
+    const camp=String(r[map.campaign]||"").trim()||net||"organic";
+    const k=date+"\u0001"+(net||"")+"\u0001"+camp+"\u0001"+metric;
+    agg.set(k,(agg.get(k)||0)+1); used++;
+  };
+  const reader=IMP.file.stream().pipeThrough(new TextDecoderStream()).getReader();
+  let read=0, last=0;
+  for(;;){
+    const {done,value:chunk}=await reader.read(); if(done) break;
+    read+=chunk.length;
+    for(let i=0;i<chunk.length;i++){ const c=chunk[i];
+      if(q){ if(c==='"'){ if(chunk[i+1]==='"'){cell+='"';i++;} else q=false; } else cell+=c; }
+      else if(c==='"') q=true; else if(c===','){row.push(cell);cell="";}
+      else if(c==='\n'){ row.push(cell); onRow(row); row=[]; cell=""; }
+      else if(c!=='\r') cell+=c; }
+    if(read-last>2e6){ last=read; const p=Math.min(99,read/IMP.file.size*100); bar.style.width=p+"%"; pt.textContent=`${fa(p,0)}٪ · ${fa(n)} ردیف خوانده شد`; await new Promise(r=>setTimeout(r,0)); }
+  }
+  if(cell||row.length){row.push(cell);onRow(row);}
+  bar.style.width="100%";
+  const out=[]; for(const [k,v] of agg){const [date,net,camp,metric]=k.split("\u0001"); out.push({date,net,camp,metric,v});}
+  IMP.result=out;
+  const dates=[...new Set(out.map(o=>o.date))].sort();
+  const inst=out.filter(o=>o.metric==="installs").reduce((s,o)=>s+o.v,0);
+  const evTot={}; out.filter(o=>o.metric!=="installs").forEach(o=>evTot[o.metric]=(evTot[o.metric]||0)+o.v);
+  const evTop=Object.entries(evTot).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const kindTop=Object.entries(kinds).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  pt.textContent=`${fa(n)} ردیف خوانده شد.`;
+  document.getElementById("resultText").innerHTML=`<p style="margin:0">بازه <b>${dates.length?jLong(dates[0])+" تا "+jLong(dates[dates.length-1]):"–"}</b> · <b>${fa(inst)}</b> نصب · <b>${fa(Object.keys(evTot).length)}</b> نوع رویداد · ${fa(new Set(out.map(o=>o.camp)).size)} کمپین</p>
+   <p class="note">نوع فعالیت‌ها در فایل: ${kindTop.map(([k,v])=>esc(k)+" ("+fa(v)+")").join("، ")}${bad?` · ${fa(bad)} ردیف تاریخ نامعتبر داشت`:""}</p>
+   <p class="note">رویدادهای پرتکرار: ${evTop.map(([k,v])=>esc(k)+" ("+fa(v)+")").join("، ")||"–"}</p>`;
+  document.getElementById("importResult").hidden=false;
+  document.getElementById("saveNote").textContent=canWrite()?"":"ذخیره در شیت فقط داخل claude.ai یا نسخه Google کار می‌کند.";
+  document.getElementById("importSave").disabled=!canWrite();
+}
+async function saveImport(){
+  const note=document.getElementById("saveNote"), btn=document.getElementById("importSave");
+  if(!canWrite()||!IMP.result) return; btn.disabled=true; note.textContent="در حال ذخیره…";
+  try{
+    const client=S.client||"Daric";
+    const dates=IMP.result.map(o=>o.date).sort(); const dmin=dates[0], dmax=dates[dates.length-1];
+    const got=await sheetGet("data!A1:H");
+    const vals=got.length?got:[["date","jdate","client","source","campaign_id","campaign","metric","value"]];
+    const header=vals[0], body=vals.slice(1);
+    const kept=body.filter(r=>!(r[2]===client&&r[3]==="adtrace"&&r[0]>=dmin&&r[0]<=dmax));
+    const add=IMP.result.map(o=>{const [jy,jm,jd]=jParts(o.date);return [o.date,`${jy}-${pad(jm)}-${pad(jd)}`,client,"adtrace",o.net,o.camp,o.metric,o.v];});
+    const all=[header,...kept,...add];
+    while(all.length<vals.length) all.push(["","","","","","","",""]);
+    const CH=2000;
+    for(let i=0;i<all.length;i+=CH){
+      note.textContent=`در حال ذخیره… ${fa(Math.min(100,(i+CH)/all.length*100),0)}٪`;
+      await sheetSet(`data!A${i+1}:H${Math.min(all.length,i+CH)}`,all.slice(i,i+CH));
+    }
+    const next=(await sheetGet("files!A1:A")).length+1;
+    await sheetSet(`files!A${next}:H${next}`,[[new Date().toISOString().slice(0,16).replace("T"," "),client,"adtrace",IMP.file.name,"browser import",add.length,"ok",IMP.header.join(" | ").slice(0,4000)]]);
+    note.textContent=`${fa(add.length)} ردیف خلاصه در شیت ذخیره شد.`;
+    await reloadSheet();
+  }catch(e){
+    note.textContent = e&&e.code ? (ERR_COPY[e.code]||("ذخیره نشد: "+(e.message||e.code))) : "ذخیره نشد.";
+    btn.disabled=false;
+  }
+}
+
+/* ---------- export: a self-contained report for the current client and range ---------- */
+/* marker comments built from pieces, so no slash-star or double slash appears inside strings or regexes */
+const CMT = n => "/"+"*"+n+"*"+"/";
+const MARK = n => new RegExp("\\/\\*"+n+"\\*\\/[\\s\\S]*?\\/\\*END\\*\\/");
+async function exportReport(){
+  const info=clientInfo();
+  const rows=DB.rows.filter(r=>r.client===S.client&&r.date>=S.from&&r.date<=S.to);
+  const snap={generated:new Date().toISOString(),clients:[info],rows:rows.map(r=>[r.date,r.client,r.source,r.campaign_id,r.campaign,r.metric,r.value])};
+  const rep={made:new Date().toISOString().slice(0,10),state:Object.assign({},S,{preset:0})};
+  const html="<!doctype html>\n"+PAGE_SOURCE
+    .replace(MARK("SNAPSHOT"),()=>CMT("SNAPSHOT")+JSON.stringify(snap)+CMT("END"))
+    .replace(MARK("REPORT"),()=>CMT("REPORT")+JSON.stringify(rep)+CMT("END"));
+  const filename=`report-${S.client}-${jParts(S.from).join("-")}_${jParts(S.to).join("-")}.html`;
+  const dl = window.claude&&window.claude.use ? await window.claude.use("downloads").catch(()=>null) : null;
+  if(dl){
+    try{ await dl.save({filename,data:html}); }
+    catch(e){ if(e&&e.code!=="declined"){ statusNote="ذخیره فایل در این نما ممکن نشد."; setStatus(); } }
+    return;
+  }
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([html],{type:"text/html"}));
+  a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* start right away; draw the charts whenever the chart library arrives (inside Google Apps Script it can load after this script) */
+boot().catch(e=>{ statusNote="خطا: "+(e&&e.message||e); try{setStatus();}catch(_){} });
+if(!window.Chart){ const iv=setInterval(()=>{ if(window.Chart){ clearInterval(iv); try{render();}catch(e){} } },150); setTimeout(()=>clearInterval(iv),30000); }
+})();
+</script>
+
+</body>
+</html>
