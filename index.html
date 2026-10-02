@@ -172,6 +172,33 @@ tfoot td{font-weight:700;border-bottom:0;position:sticky;bottom:0;background:var
 th small{display:block;font-size:10.5px;color:var(--muted);font-weight:400}
 .legend-t{display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--ink-2)}
 .legend-t i{display:inline-block;width:46px;height:10px;border-radius:3px;background:linear-gradient(to left,color-mix(in srgb,var(--good) 45%,transparent),color-mix(in srgb,var(--good) 10%,transparent) 48%,color-mix(in srgb,var(--bad) 10%,transparent) 52%,color-mix(in srgb,var(--bad) 50%,transparent))}
+/* page tabs: dashboard / client report */
+.page-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:-4px}
+.page-tabs button{border:0;background:none;padding:8px 16px 10px;cursor:pointer;font-size:14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px;display:inline-flex;gap:8px;align-items:center}
+.page-tabs button svg{width:16px;height:16px}
+.page-tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+body.page-report .dash-only{display:none!important}
+.rep-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rep-doc{background:var(--surface);border:1px solid var(--ring);border-radius:16px;box-shadow:var(--shadow);max-width:900px;width:100%;margin-inline:auto;padding:clamp(18px,4vw,40px);display:grid;gap:22px}
+.rep-head{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent);padding-bottom:18px}
+.rep-head h2{margin:0;font-size:22px;font-weight:800}
+.rep-head .range{color:var(--ink-2);font-size:13.5px}
+.rep-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.rep-stat{background:var(--accent-wash);border-radius:12px;padding:12px 14px}
+.rep-stat .k{font-size:12px;color:var(--ink-2)}
+.rep-stat .v{font-size:21px;font-weight:800;line-height:1.35}
+.rep-stat .d{font-size:12px}
+.rep-chart{position:relative;height:260px}
+.rep-body{font-size:15px;line-height:2;outline:0;border-radius:10px;padding:4px 8px;margin:-4px -8px}
+.rep-body[contenteditable="true"]:hover{box-shadow:0 0 0 1px var(--line)}
+.rep-body[contenteditable="true"]:focus{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
+.rep-body h3{font-size:16px;margin:18px 0 4px;color:var(--accent)}
+.rep-body h3:first-child{margin-top:0}
+.rep-body p{margin:0 0 8px}
+.rep-body ul{margin:0 0 8px;padding-inline-start:22px}
+.rep-foot{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+.edit-hint{font-size:12px;color:var(--ink-2);background:var(--wash);border-radius:8px;padding:6px 10px}
+@media print{body{background:#fff}body.page-report .wrap>*:not(#reportView){display:none!important}#reportView .rep-tools{display:none}.rep-doc{border:0;box-shadow:none;padding:0;max-width:none}}
 .report-only{display:none}
 body.report .no-report{display:none!important}
 body.report .report-only{display:block}
@@ -198,6 +225,11 @@ body.report .report-only{display:block}
       <button class="btn primary no-report" id="exportBtn" type="button">خروجی گزارش مشتری</button>
     </div>
   </header>
+
+  <nav class="page-tabs" id="pageTabs" role="tablist" aria-label="بخش‌ها">
+    <button type="button" role="tab" data-page="dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>داشبورد</button>
+    <button type="button" role="tab" data-page="report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>گزارش مشتری</button>
+  </nav>
 
   <p class="note report-only" id="reportNote"></p>
 
@@ -264,9 +296,9 @@ body.report .report-only{display:block}
     </details>
   </section>
 
-  <section class="kpis" id="kpis" aria-label="شاخص‌های اصلی"></section>
+  <section class="kpis dash-only" id="kpis" aria-label="شاخص‌های اصلی"></section>
 
-  <div class="grid2">
+  <div class="grid2 dash-only">
     <section class="panel" aria-label="نمودار">
       <div class="panel-head">
         <h2 id="chartTitle">روند</h2>
@@ -296,7 +328,27 @@ body.report .report-only{display:block}
     <section class="summary" id="summary" aria-label="نکته‌ها"></section>
   </div>
 
-  <section class="panel">
+  <section class="report-view" id="reportView" hidden aria-label="گزارش مشتری">
+    <div class="rep-tools no-report" style="margin-bottom:12px">
+      <button class="btn" id="repRegen" type="button">نوشتن دوباره از روی داده</button>
+      <button class="btn" id="repSave" type="button">ذخیره متن</button>
+      <button class="btn" id="repPrint" type="button">چاپ / PDF</button>
+      <span class="edit-hint">روی متن کلیک کنید و هر جا را خواستید عوض کنید. «خروجی گزارش مشتری» همین متن را با خودش می‌برد.</span>
+      <span class="note" id="repNote"></span>
+    </div>
+    <article class="rep-doc" id="repDoc">
+      <header class="rep-head">
+        <div><h2 id="repTitle"></h2><span class="range" id="repRange"></span></div>
+        <span class="logo-badge" id="repLogo" hidden><img alt=""></span>
+      </header>
+      <div class="rep-stats" id="repStats"></div>
+      <div class="rep-chart"><canvas id="repChart"></canvas></div>
+      <div class="rep-body" id="repBody" contenteditable="true" spellcheck="false"></div>
+      <footer class="rep-foot" id="repFoot"></footer>
+    </article>
+  </section>
+
+  <section class="panel dash-only">
     <div class="panel-head">
       <h2>جدول ترکیبی <span class="tag" style="font-size:12px">هزینه شبکه تبلیغاتی + نصب و رویداد ترکر</span></h2>
       <div class="actions">
@@ -406,7 +458,7 @@ function tableToObjects(rows){const h=rows[0].map(s=>s.trim());return rows.slice
 let DB = null;
 const S = Object.assign({
   client:null, from:null, to:null, preset:0, source:"", camps:null, events:null,
-  trendMetric:null, barMetric:null, scatterMetric:null, view:"trend", split:"total", gran:"day", tableDim:"campaign", sortKey:"cost", sortDir:-1
+  trendMetric:null, barMetric:null, scatterMetric:null, view:"trend", page:"dash", split:"total", gran:"day", tableDim:"campaign", sortKey:"cost", sortDir:-1
 }, store.get("state2", {}));
 let charts = {};
 
@@ -422,13 +474,14 @@ function setStatus(){
   const hhmm=new Date(DB.loadedAt).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"});
   t.textContent = statusNote || (DB.live ? "زنده از Google Sheets · "+hhmm : "نسخه ذخیره‌شده · "+jLong(DB.loadedAt.slice(0,10)));
 }
-function fromTable(dataRows, clientRows, at){
+function reportsFrom(rows){ if(!rows||!rows.length||String(rows[0][0]).trim()!=="client"||!rows[0].includes("html")) return []; return tableToObjects(rows); }
+function fromTable(dataRows, clientRows, at, reportRows){
   const data=tableToObjects(dataRows), clients=clientRows&&clientRows.length?tableToObjects(clientRows):[];
-  return { clients, rows: data.filter(r=>r.date&&r.metric).map(r=>({date:r.date,client:r.client,source:r.source,campaign_id:r.campaign_id,campaign:r.campaign,metric:r.metric,value:+String(r.value).replace(/,/g,"")||0})),
+  return { clients, reports: reportsFrom(reportRows), rows: data.filter(r=>r.date&&r.metric).map(r=>({date:r.date,client:r.client,source:r.source,campaign_id:r.campaign_id,campaign:r.campaign,metric:r.metric,value:+String(r.value).replace(/,/g,"")||0})),
            loadedAt: at||new Date().toISOString(), live:true };
 }
 /* inside claude.ai: read the sheet through the viewer's Google Sheets connector and keep it current */
-let MCP=null, live={data:null,clients:null,at:null};
+let MCP=null, live={data:null,clients:null,reports:null,at:null};
 const ERR_COPY={
   needs_reauth:"اتصال Google Sheets منقضی شده؛ در تنظیمات claude.ai دوباره وصل کنید",
   server_not_connected:"Google Sheets وصل نیست؛ از تنظیمات claude.ai بخش Connectors وصلش کنید",
@@ -442,7 +495,7 @@ function onSheet(part){
     if(ev.type==="data"){
       const v=ev.result.payload&&ev.result.payload.values; if(!Array.isArray(v)) return;
       live[part]=v; live.at=ev.result.cache?new Date(ev.result.cache.storedAt).toISOString():new Date().toISOString();
-      if(live.data){ DB=fromTable(live.data,live.clients,live.at); statusNote=""; setStatus(); render(); }
+      if(live.data){ DB=fromTable(live.data,live.clients,live.at,live.reports); statusNote=""; setStatus(); render(); }
     } else {
       const code=ev.error&&ev.error.code;
       const deny=["needs_reauth","server_not_connected","blocked_by_policy","approval_required","not_in_manifest","selection_required"].includes(code);
@@ -459,6 +512,7 @@ async function startConnector(){
   const opts={refetchInterval:300000};
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"data!A1:H"},onSheet("data"),opts);
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"clients!A1:J"},onSheet("clients"),opts);
+  MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"reports!A1:E"},onSheet("reports"),opts);
   return true;
 }
 /* outside claude.ai: the published CSV of the sheet (needs link sharing on) */
@@ -469,7 +523,7 @@ async function fetchSheet(tab){
   const text=await res.text(); if(/^\s*</.test(text)) throw new Error("not shared");
   return parseCSV(text);
 }
-async function loadCSV(){ const [d,c]=await Promise.all([fetchSheet("data"),fetchSheet("clients")]); return fromTable(d,c); }
+async function loadCSV(){ const [d,c,r]=await Promise.all([fetchSheet("data"),fetchSheet("clients"),fetchSheet("reports").catch(()=>null)]); return fromTable(d,c,null,r); }
 /* inside a Google Apps Script web app the page talks to the sheet through google.script.run */
 const GAS = !!(window.google&&google.script&&google.script.run);
 const gas = (fn,...a) => new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej({message:String(e&&e.message||e)}))[fn](...a));
@@ -651,6 +705,8 @@ function initControls(){
   document.getElementById("refreshBtn").onclick=refresh;
   document.getElementById("targetsBtn").onclick=e=>{const b=document.getElementById("targetsBox");b.hidden=!b.hidden;e.currentTarget.setAttribute("aria-expanded",String(!b.hidden));render();};
   document.getElementById("exportBtn").onclick=exportReport;
+  document.querySelectorAll("#pageTabs button").forEach(b=>b.onclick=()=>{S.page=b.dataset.page;render();});
+  initReportEditor();
   document.getElementById("importBtn").onclick=()=>{const p=document.getElementById("importer");p.hidden=!p.hidden;};
   document.getElementById("importClose").onclick=()=>{document.getElementById("importer").hidden=true;};
   initImporter();
@@ -748,6 +804,10 @@ function render(){
 
   const recs=pivot(cur,idx), prevRecs=pivot(prev,idx);
   renderSummary(info,recs,idx,rowsAll);
+  document.body.classList.toggle("page-report",S.page==="report");
+  document.getElementById("reportView").hidden=S.page!=="report";
+  document.querySelectorAll("#pageTabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.page===S.page)));
+  if(S.page==="report") renderReportPage(info,recs,prevRecs,prev.length>0,span,from,to,M,brand);
   renderKPIs(info,M,recs,prevRecs,prev.length>0,span,from,to);
   if(S.view==="bar") renderBar(recs,colors); else if(S.view==="scatter") renderScatter(recs,colors,info); else renderTrend(recs,colors,from,to);
   renderTable(recs,M,colors,idx);
@@ -942,6 +1002,137 @@ function renderTable(recs,M,colors,idx){
   t.querySelectorAll("th").forEach(th=>th.onclick=()=>{const k=th.dataset.k; if(S.sortKey===k) S.sortDir*=-1; else {S.sortKey=k;S.sortDir=k==="key"?1:-1;} render();});
 }
 
+/* ---------- client report: a written review of the period that Arya can edit before exporting ---------- */
+const REP={key:null,html:"",edited:false,saveT:null};
+const repKey=()=>S.client+"|"+S.from+"|"+S.to;
+/* keep only plain formatting from edited or stored text */
+function cleanHtml(html){
+  const t=document.createElement("template"); t.innerHTML=String(html||"");
+  const OK=new Set(["H3","P","B","STRONG","I","EM","UL","OL","LI","BR","DIV","SPAN"]);
+  (function walk(n){ [...n.childNodes].forEach(c=>{ if(c.nodeType===1){ if(!OK.has(c.tagName)){ c.replaceWith(document.createTextNode(c.textContent)); return; }
+      [...c.attributes].forEach(a=>c.removeAttribute(a.name)); walk(c); } else if(c.nodeType!==3) c.remove(); }); })(t.content);
+  return t.innerHTML;
+}
+function savedReport(){
+  const k=repKey(), local=store.get("rep:"+k,null);
+  const sheet=(DB.reports||[]).filter(r=>r.client===S.client&&r.from===S.from&&r.to===S.to).sort((a,b)=>String(b.updated).localeCompare(String(a.updated)))[0];
+  const cands=[local,sheet&&{html:sheet.html,updated:sheet.updated}].filter(x=>x&&x.html);
+  cands.sort((a,b)=>String(b.updated).localeCompare(String(a.updated)));
+  return cands[0]||null;
+}
+const pctTxt=x=>fa(Math.abs(x)*100,0)+"٪";
+const evName=e=>({KYC:"احراز هویت (KYC)",Register:"ثبت‌نام",LogIn:"ورود",Login:"ورود","Deposit Request":"درخواست واریز",Deposit:"واریز",Buy:"خرید",Sell:"فروش",Withdraw:"برداشت",Purchase:"خرید"}[e]||e);
+/* draft text in a positive, client-facing tone, written from the numbers on screen */
+function draftReport(info,recs,prevRecs,hasPrev,from,to){
+  const name=esc(info.display_name||S.client), cur=esc(info.currency||"تومان");
+  const a=aggregate(recs), b=aggregate(prevRecs);
+  const cost=a.s.cost||0, inst=a.s.installs||0, cpi=value(a,"cpa:installs"), pcpi=hasPrev?value(b,"cpa:installs"):null, pinst=hasPrev?(b.s.installs||0):0;
+  const days=dayDiff(from,to)+1, H=[];
+  /* overview */
+  let p=`در بازه <b>${jLong(from)}</b> تا <b>${jLong(to)}</b> (${fa(days)} روز)، کمپین‌های تبلیغاتی ${name} با بودجه‌ای معادل <b>${compact(cost)} ${cur}</b> اجرا شدند`;
+  if(inst) p+=` و <b>${fa(inst)} نصب جدید</b> به همراه داشتند. میانگین هزینه هر نصب (CPI) <b>${fa(cpi)} ${cur}</b> بود`;
+  p+=".";
+  if(inst&&TARGETS["cpa:installs"]&&cpi<=TARGETS["cpa:installs"]) p+=` این عدد ${pctTxt(1-cpi/TARGETS["cpa:installs"])} بهتر از هدف تعیین‌شده (${fa(TARGETS["cpa:installs"])}) است.`;
+  if(hasPrev&&pinst&&inst){ const ch=inst/pinst-1;
+    p+= ch>=0.03?` تعداد نصب نسبت به دوره قبل <b>${pctTxt(ch)} رشد</b> داشته است.`:ch>-0.03?` حجم نصب نسبت به دوره قبل پایدار مانده است.`:"";
+    if(pcpi&&cpi){const c2=cpi/pcpi-1; if(c2<=-0.03) p+=` همزمان هزینه هر نصب <b>${pctTxt(c2)} کاهش</b> یافته که نشان می‌دهد بودجه بهینه‌تر خرج شده است.`;} }
+  H.push("<h3>خلاصه عملکرد</h3><p>"+p+"</p>");
+  /* trend */
+  const byDay={}; recs.forEach(r=>{(byDay[r.date]=byDay[r.date]||[]).push(r);});
+  const dd=Object.keys(byDay).sort().map(d=>({d,a:aggregate(byDay[d])})).filter(x=>(x.a.s.installs||0)>0);
+  if(dd.length>=2){
+    const best=[...dd].sort((x,y)=>(y.a.s.installs||0)-(x.a.s.installs||0))[0];
+    const half=Math.floor(dd.length/2), c1=aggregate(dd.slice(0,half).flatMap(x=>byDay[x.d])), c2=aggregate(dd.slice(dd.length-half).flatMap(x=>byDay[x.d]));
+    const v1=value(c1,"cpa:installs"), v2=value(c2,"cpa:installs");
+    let t=`بیشترین نصب روزانه در <b>${jDow(best.d)} ${jLong(best.d)}</b> با ${fa(best.a.s.installs)} نصب ثبت شد.`;
+    if(v1&&v2){ const ch=v2/v1-1;
+      t+= ch<=-0.03?` روند هزینه هر نصب رو به بهبود بوده و در روزهای پایانی بازه به‌طور میانگین ${pctTxt(ch)} ارزان‌تر از روزهای ابتدایی شده است.`
+        : ch<0.03?` هزینه هر نصب در طول بازه ثابت و قابل پیش‌بینی باقی ماند.`
+        : ` با رقابتی‌تر شدن فضای تبلیغات در روزهای پایانی، هزینه هر نصب کمی بالاتر رفت؛ بهینه‌سازی کمپین‌ها برای بازگرداندن آن در دستور کار است.`; }
+    H.push("<h3>روند</h3><p>"+t+"</p>");
+  }
+  /* funnel events */
+  const evs=S.events.filter(e=>(a.s[e]||0)>0);
+  if(evs.length){
+    const li=evs.map(e=>{const c=value(a,"cpa:"+e); return `<li><b>${fa(a.s[e])}</b> ${esc(evName(e))}${c?`، با هزینه <b>${fa(c)} ${cur}</b> برای هر مورد`:""}</li>`;}).join("");
+    H.push(`<h3>اقدامات کاربران</h3><p>کاربرانی که از این کمپین‌ها جذب شدند، در اپلیکیشن این اقدامات را انجام دادند:</p><ul>${li}</ul>`);
+  }
+  /* campaigns */
+  const per=new Map(); recs.forEach(r=>{(per.get(r.ck)||per.set(r.ck,{name:r.campaign,recs:[]}).get(r.ck)).recs.push(r);});
+  const camps=[...per.values()].map(c=>{const g=aggregate(c.recs);return {name:c.name,inst:g.s.installs||0,cpi:value(g,"cpa:installs"),g};}).filter(c=>c.inst>0&&c.cpi);
+  if(camps.length){
+    const top=[...camps].sort((x,y)=>y.inst-x.inst).slice(0,3);
+    let t=`<p>پرنتیجه‌ترین کمپین‌ها:</p><ul>${top.map(c=>`<li><b>${esc(c.name)}</b>: ${fa(c.inst)} نصب (${pctTxt(c.inst/(inst||1))} از کل) با CPI ${fa(c.cpi)}</li>`).join("")}</ul>`;
+    const vol=camps.filter(c=>c.inst>=Math.max(10,inst*0.02)).sort((x,y)=>x.cpi-y.cpi)[0];
+    if(vol&&!top.includes(vol)) t+=`<p>کمپین <b>${esc(vol.name)}</b> با CPI ${fa(vol.cpi)} به‌صرفه‌ترین نصب‌ها را آورد.</p>`;
+    const e0=evs[0]; if(e0){ const ce=[...per.values()].map(c=>{const g=aggregate(c.recs);return {name:c.name,n:g.s[e0]||0,c:value(g,"cpa:"+e0)};}).filter(x=>x.n>=5&&x.c).sort((x,y)=>x.c-y.c)[0];
+      if(ce) t+=`<p>در ${esc(evName(e0))}، کمپین <b>${esc(ce.name)}</b> با ${fa(ce.c)} ${cur} برای هر مورد بهترین بازده را داشت.</p>`; }
+    H.push("<h3>کمپین‌های برتر</h3>"+t);
+  }
+  /* next steps */
+  const steps=[];
+  const cheap=camps.filter(c=>c.inst>=Math.max(10,inst*0.02)).sort((x,y)=>x.cpi-y.cpi).slice(0,2);
+  if(cheap.length) steps.push(`افزایش سهم بودجه کمپین‌های پربازده (${cheap.map(c=>esc(c.name)).join(" و ")}) برای جذب نصب بیشتر با همین هزینه.`);
+  steps.push("بازبینی و بهینه‌سازی کمپین‌های کم‌بازده و انتقال بودجه آن‌ها به کانال‌های موفق‌تر.");
+  if(evs.length) steps.push(`تمرکز بیشتر بر کیفیت کاربر و افزایش ${esc(evName(evs[0]))} در کنار حجم نصب.`);
+  H.push(`<h3>گام‌های بعدی</h3><ul>${steps.map(x=>`<li>${x}</li>`).join("")}</ul>`);
+  return H.join("");
+}
+function renderReportPage(info,recs,prevRecs,hasPrev,span,from,to,M,brand){
+  document.getElementById("repTitle").textContent="گزارش عملکرد تبلیغات "+(info.display_name||S.client);
+  document.getElementById("repRange").textContent=jLong(from)+" تا "+jLong(to);
+  const lg=document.getElementById("repLogo"); lg.hidden=!brand.src; if(brand.src) lg.querySelector("img").src=brand.src;
+  const a=aggregate(recs), b=aggregate(prevRecs), cur=esc(info.currency||"");
+  const stats=[["cost","هزینه"],["installs","نصب"],["cpa:installs","هزینه هر نصب (CPI)"]].filter(([m])=>M.includes(m));
+  S.events.slice(0,2).forEach(e=>{ if(M.includes("cpa:"+e)) stats.push(["cpa:"+e,"هزینه هر "+evName(e)]); });
+  document.getElementById("repStats").innerHTML=stats.map(([m,k])=>{ const v=value(a,m), pv=hasPrev?value(b,m):null;
+    let d=""; if(pv&&v!=null&&m!=="cost"){ const ch=v/pv-1, good=isCostLike(m)?ch<0:ch>0; if(good&&Math.abs(ch)>=0.01) d=`<div class="d good">${isCostLike(m)?"▼":"▲"} ${pctTxt(ch)} بهتر از دوره قبل</div>`; }
+    return `<div class="rep-stat"><div class="k">${esc(k)}</div><div class="v">${m==="cost"?compact(v):fa(v)} <small style="font-size:12px;font-weight:500;color:var(--muted)">${m==="installs"?"":cur}</small></div>${d}</div>`; }).join("");
+  document.getElementById("repFoot").textContent=`داده‌ها: هزینه از پنل شبکه تبلیغاتی و نصب و رویدادها از ترکر. هزینه هر نصب و هر اقدام فقط برای روزهایی حساب شده که داده ترکر دارند.`;
+  /* text: what was saved for this client and period, else a fresh draft; never overwrite while being edited */
+  const body=document.getElementById("repBody"), k=repKey();
+  body.contentEditable=REPORT?"false":"true";
+  if(REPORT&&REPORT.narr){ if(REP.key!==k){ REP.key=k; body.innerHTML=cleanHtml(REPORT.narr); } }
+  else if(REP.key!==k){ const sv=savedReport(); REP.key=k; REP.edited=!!sv; body.innerHTML=sv?cleanHtml(sv.html):draftReport(info,recs,prevRecs,hasPrev,from,to); repNote(sv?"متن ذخیره‌شده این بازه":""); }
+  else if(!REP.edited&&document.activeElement!==body) body.innerHTML=draftReport(info,recs,prevRecs,hasPrev,from,to);
+  REP.ctx=[info,recs,prevRecs,hasPrev,from,to];
+  /* daily installs with CPI line */
+  if(!window.Chart) return; chartBase();
+  const days=[]; for(let d=from; d<=to; d=addDays(d,1)) days.push(d);
+  const byDay={}; recs.forEach(r=>{(byDay[r.date]=byDay[r.date]||[]).push(r);});
+  const ac=accentColor(), hasI=M.includes("installs");
+  const ds=hasI?[{type:"bar",label:"نصب",data:days.map(d=>byDay[d]?aggregate(byDay[d]).s.installs||null:null),backgroundColor:alpha(ac,.75),borderRadius:4,yAxisID:"y",order:2},
+      {type:"line",label:"هزینه هر نصب",data:days.map(d=>byDay[d]?value(aggregate(byDay[d]),"cpa:installs"):null),borderColor:cssVar("--s2"),backgroundColor:cssVar("--s2"),borderWidth:2,tension:.3,pointRadius:3,spanGaps:true,yAxisID:"y2",order:1}]
+    : [{type:"bar",label:"هزینه",data:days.map(d=>byDay[d]?aggregate(byDay[d]).s.cost||null:null),backgroundColor:alpha(ac,.75),borderRadius:4,yAxisID:"y"}];
+  charts.rep&&charts.rep.destroy();
+  charts.rep=new Chart(document.getElementById("repChart"),{data:{labels:days.map(jShort),datasets:ds},
+    options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:c=>` ${c.dataset.label}: ${fa(c.parsed.y)}`}}},
+      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:12}},y:{beginAtZero:true,grid:{color:cssVar("--line")},border:{display:false},ticks:{callback:v=>compact(v),maxTicksLimit:5}},
+        y2:{display:hasI,position:"right",beginAtZero:true,grid:{display:false},border:{display:false},ticks:{callback:v=>compact(v),maxTicksLimit:5}}}}});
+}
+function repNote(t){ const n=document.getElementById("repNote"); if(n) n.textContent=t||""; }
+function initReportEditor(){
+  const body=document.getElementById("repBody");
+  body.addEventListener("input",()=>{ REP.edited=true; clearTimeout(REP.saveT);
+    REP.saveT=setTimeout(()=>{ store.set("rep:"+REP.key,{html:cleanHtml(body.innerHTML),updated:new Date().toISOString()}); repNote(canWrite()?"در این مرورگر نگه داشته شد؛ برای ذخیره در شیت «ذخیره متن» را بزنید":"در این مرورگر ذخیره شد"); },600); });
+  body.addEventListener("paste",e=>{ e.preventDefault(); const t=(e.clipboardData||window.clipboardData).getData("text/plain"); document.execCommand("insertText",false,t); });
+  document.getElementById("repRegen").onclick=()=>{ if(REP.edited&&!confirm("متن ویرایش‌شده با متن تازه از روی داده جایگزین شود؟")) return;
+    REP.edited=false; store.set("rep:"+REP.key,null); body.innerHTML=draftReport(...REP.ctx); repNote("متن تازه از روی داده نوشته شد"); };
+  document.getElementById("repSave").onclick=saveReportText;
+  document.getElementById("repPrint").onclick=()=>window.print();
+}
+async function saveReportText(){
+  const html=cleanHtml(document.getElementById("repBody").innerHTML), now=new Date().toISOString();
+  store.set("rep:"+REP.key,{html,updated:now}); REP.edited=true;
+  if(!canWrite()){ repNote("در این مرورگر ذخیره شد. (ذخیره در شیت فقط از نسخه claude.ai ممکن است)"); return; }
+  try{ repNote("در حال ذخیره…");
+    const rows=await sheetGet("reports!A1:C"); let i=rows.findIndex((r,j)=>j>0&&r[0]===S.client&&r[1]===S.from&&r[2]===S.to);
+    if(i<0) i=Math.max(rows.length,1);
+    await sheetSet(`reports!A${i+1}:E${i+1}`,[[S.client,S.from,S.to,now,html]]);
+    repNote("در شیت ذخیره شد و روی سایت هم دیده می‌شود.");
+  }catch(e){ repNote((e&&e.code&&ERR_COPY[e.code])||("ذخیره نشد"+(e&&e.message?": "+e.message:""))); }
+}
+
 /* ---------- Adtrace importer: aggregate a raw export in the browser, store only the summary ---------- */
 const IMP={file:null,header:null,headerLine:0,map:{},result:null,wide:null};
 /* Adtrace "Full Data Export" is already counted: one column per event (Installs, Register, KYC, ...) */
@@ -1087,7 +1278,9 @@ async function exportReport(){
   const info=clientInfo();
   const rows=DB.rows.filter(r=>r.client===S.client&&r.date>=S.from&&r.date<=S.to);
   const snap={generated:new Date().toISOString(),clients:[info],rows:rows.map(r=>[r.date,r.client,r.source,r.campaign_id,r.campaign,r.metric,r.value])};
-  const rep={made:new Date().toISOString().slice(0,10),state:Object.assign({},S,{preset:0})};
+  const body=document.getElementById("repBody");
+  const sv=savedReport(), narr=REP.key===repKey()&&body.innerHTML.trim()?cleanHtml(body.innerHTML):(sv?cleanHtml(sv.html):null);
+  const rep={made:new Date().toISOString().slice(0,10),state:Object.assign({},S,{preset:0}),narr};
   const html="<!doctype html>\n"+PAGE_SOURCE
     .replace(MARK("SNAPSHOT"),()=>CMT("SNAPSHOT")+JSON.stringify(snap)+CMT("END"))
     .replace(MARK("REPORT"),()=>CMT("REPORT")+JSON.stringify(rep)+CMT("END"))
