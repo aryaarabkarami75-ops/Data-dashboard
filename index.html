@@ -830,7 +830,7 @@ function render(){
   const M=metricList(rowsAll,S.events);
   const hasInstalls=M.includes("installs");
   const ev0=S.events.find(e=>M.includes("cpa:"+e));
-  if(!M.includes(S.trendMetric)) S.trendMetric=hasInstalls?"cpa:installs":ev0?"cpa:"+ev0:M[0];
+  if(!M.includes(S.trendMetric)) S.trendMetric=hasInstalls?"cpa:installs":ev0?"cpa:"+ev0:(info.headline_metrics||"").split(",").map(x=>x.trim()).find(x=>x!=="cost"&&M.includes(x))||M[0];
   if(!M.includes(S.barMetric)) S.barMetric=hasInstalls?"installs":M[0];
   const MC=M.filter(m=>m.startsWith("cpa:")||m==="cpc");
   if(!MC.length&&S.view==="scatter") S.view="trend";
@@ -875,7 +875,7 @@ function renderSummary(info,recs,idx,rowsAll){
     items.push(`داده ادتریس فقط از ${jLong(td[0])} تا ${jLong(td[td.length-1])} است؛ CPI و CPA فقط با هزینه همین روزها (${compact(costT)} ${esc(cur)}) حساب شده‌اند.`); }
   const hasConv=rowsAll.some(r=>!CORE.includes(r.metric));
   if(!hasTracker&&!hasConv){
-    items.push(`برای این مشتری فقط داده شبکه تبلیغاتی (هزینه، کلیک و نمایش) هست. اگر نصب یا اقدامی دارد، فایل ترکر یا گزارش اقدام‌ها را در پوشه Drive همین مشتری بگذارید.`);
+    items.push(`برای این مشتری فقط داده شبکه تبلیغاتی (هزینه، کلیک و نمایش) هست.`);
   } else if(hasTracker) {
     const paid=camps.filter(c=>c.cost>0);
     const paidInst=paid.reduce((s,c)=>s+c.inst,0);
