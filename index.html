@@ -200,7 +200,8 @@ body.page-report .dash-only{display:none!important}
 .rep-body ul{margin:0 0 8px;padding-inline-start:22px}
 .rep-foot{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
 .edit-hint{font-size:12px;color:var(--ink-2);background:var(--wash);border-radius:8px;padding:6px 10px}
-@media print{body{background:#fff}body.page-report .wrap>*:not(#reportView){display:none!important}#reportView .rep-tools{display:none}.rep-doc{border:0;box-shadow:none;padding:0;max-width:none}}
+@page{size:A4;margin:12mm}
+@media print{body{background:#fff}body.page-report .wrap>*:not(#reportView){display:none!important}#reportView .rep-tools{display:none}.wrap{max-width:none;width:auto;padding:0;display:block}#reportView,.rep-doc{width:auto!important;max-width:100%!important;min-width:0;margin:0}.rep-doc{border:0;box-shadow:none;padding:0}.rep-stats{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}.rep-chart{break-inside:avoid}.rep-chart{height:auto}.rep-chart canvas{max-width:100%!important;height:auto!important;margin-inline:auto}.rep-body h3{break-after:avoid}}
 .report-only{display:none}
 body.report .no-report{display:none!important}
 body.report .report-only{display:block}
@@ -493,6 +494,12 @@ const S = Object.assign({
   trendMetric:null, barMetric:null, scatterMetric:null, view:"trend", page:"dash", split:"total", gran:"day", tableDim:"campaign", sortKey:"cost", sortDir:-1
 }, store.get("state2", {}));
 let charts = {};
+/* charts are drawn at screen width; redraw them at page width when printing, or the PDF cuts them off */
+/* an A4 page is about 700px wide, so the chart is redrawn at that size for printing and back afterwards */
+const printCharts=on=>Object.values(charts).forEach(c=>{ try{ if(!c) return; if(on){ const box=c.canvas.parentNode; c.resize(Math.min(680,box.clientWidth||680),box.clientHeight||260); } else c.resize(); }catch(e){} });
+window.addEventListener("beforeprint",()=>printCharts(true));
+window.addEventListener("afterprint",()=>printCharts(false));
+try{ window.matchMedia("print").addEventListener("change",e=>printCharts(e.matches)); }catch(e){}
 
 function loadSnapshot(src){
   return { clients: src.clients, rows: src.rows.map(r=>({date:r[0],client:r[1],source:r[2],campaign_id:r[3],campaign:r[4],metric:r[5],value:+r[6]||0,pub:r[7]||""})),
