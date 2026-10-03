@@ -388,7 +388,8 @@ const PAGE_SOURCE = document.documentElement.outerHTML;
 
 const LABELS = {
   cost:"هزینه", impressions:"نمایش", clicks:"کلیک", installs:"نصب",
-  ctr:"CTR", cpc:"هزینه هر کلیک", "cpa:installs":"CPI"
+  ctr:"CTR", cpc:"هزینه هر کلیک", "cpa:installs":"CPI",
+  sessions:"سشن", actions:"اقدام", "cpa:actions":"هزینه هر اقدام", "cpa:sessions":"هزینه هر سشن"
 };
 const SOURCE_LABELS = { yektanet:"یکتانت", "yektanet-cafe":"یکتانت (کافه‌بازار)", adtrace:"ادتریس", appmetrica:"اپ‌متریکا", metrix:"متریکس" };
 const CORE = ["cost","impressions","clicks"];
@@ -744,7 +745,8 @@ function render(){
   renderClientTabs(clients);
   if(!S.client){document.getElementById("kpis").innerHTML='<div class="empty">هنوز داده‌ای در شیت نیست.</div>';return;}
   const info=clientInfo(); TARGETS=Object.assign(parseTargets(info.cpa_targets),REPORT?{}:store.get("targets:"+S.client,{})); setAliases(info.campaign_aliases); setGroups(info.campaign_groups); const rowsAll=clientRows();
-  TRACK_DATES=new Set(rowsAll.filter(r=>isTracker(r.source)).map(r=>r.date));
+  /* days that have results (tracker rows, or conversions the ad network itself reports, e.g. Yektanet tag events) */
+  TRACK_DATES=new Set(rowsAll.filter(r=>isTracker(r.source)||!CORE.includes(r.metric)).map(r=>r.date));
   const dates=[...new Set(rowsAll.map(r=>r.date))].sort();
   const minD=dates[0], maxD=dates[dates.length-1];
   if(!S.to||S.to>maxD||S.to<minD) S.to=maxD;
@@ -774,7 +776,7 @@ function render(){
   S.events=S.events.filter(e=>events.includes(e));
   document.getElementById("eventField").hidden=!events.length;
   const ec=document.getElementById("eventChips");
-  ec.innerHTML=events.slice(0,30).map(e=>`<span class="chip" role="button" tabindex="0" data-e="${esc(e)}" aria-pressed="${S.events.includes(e)}">${esc(e)}</span>`).join("");
+  ec.innerHTML=events.slice(0,30).map(e=>`<span class="chip" role="button" tabindex="0" data-e="${esc(e)}" aria-pressed="${S.events.includes(e)}">${esc(label(e))}</span>`).join("");
   ec.querySelectorAll(".chip").forEach(ch=>{const fn=()=>{const e=ch.dataset.e; S.events=S.events.includes(e)?S.events.filter(x=>x!==e):[...S.events,e]; render();};
     ch.onclick=fn; ch.onkeydown=k=>{if(k.key==="Enter"||k.key===" "){k.preventDefault();fn();}};});
 
@@ -799,7 +801,8 @@ function render(){
   const prev=rowsAll.filter(r=>r.date>=prevFrom&&r.date<=prevTo&&keep(r));
   const M=metricList(rowsAll,S.events);
   const hasInstalls=M.includes("installs");
-  if(!M.includes(S.trendMetric)) S.trendMetric=hasInstalls?"cpa:installs":M[0];
+  const ev0=S.events.find(e=>M.includes("cpa:"+e));
+  if(!M.includes(S.trendMetric)) S.trendMetric=hasInstalls?"cpa:installs":ev0?"cpa:"+ev0:M[0];
   if(!M.includes(S.barMetric)) S.barMetric=hasInstalls?"installs":M[0];
   const MC=M.filter(m=>m.startsWith("cpa:")||m==="cpc");
   if(!MC.length&&S.view==="scatter") S.view="trend";
@@ -824,7 +827,7 @@ function render(){
   renderTargetsBox(info,M);
   document.getElementById("tLegend").hidden=!Object.keys(TARGETS).length;
   const unit=info.currency?` مبالغ به ${info.currency}.`:"";
-  document.getElementById("footnote").textContent=`نصب و رویدادها از ترکر و هزینه از شبکه تبلیغاتی، با نام کمپین به هم وصل شده‌اند. CPI و CPA = هزینه ÷ تعداد، فقط روی روزهایی که داده ترکر دارند. CTR فقط روی ردیف‌هایی که نمایش دارند حساب می‌شود.${unit}`;
+  document.getElementById("footnote").textContent=!rowsAll.some(r=>isTracker(r.source))?`اقدام‌ها و سشن‌ها از گزارش خود شبکه تبلیغاتی (رخداد تگ یکتانت) آمده‌اند. CPA = هزینه ÷ تعداد. CTR فقط روی ردیف‌هایی که نمایش دارند حساب می‌شود.${unit}`:`نصب و رویدادها از ترکر و هزینه از شبکه تبلیغاتی، با نام کمپین به هم وصل شده‌اند. CPI و CPA = هزینه ÷ تعداد، فقط روی روزهایی که داده ترکر دارند. CTR فقط روی ردیف‌هایی که نمایش دارند حساب می‌شود.${unit}`;
   if(REPORT) document.getElementById("reportNote").textContent=`گزارش ${info.display_name||S.client} · ساخته‌شده در ${jLong(REPORT.made)}`;
   store.set("state2",S);
 }
@@ -841,9 +844,10 @@ function renderSummary(info,recs,idx,rowsAll){
   items.push(`کل هزینه <b>${compact(cost)} ${esc(cur)}</b>`+(hasTracker?`، کل نصب <b>${fa(inst)}</b> و CPI کلی <b>${fa(value(tot,"cpa:installs"))}</b>.`:"."));
   if(hasTracker&&costT<cost-1){ const td=[...TRACK_DATES].sort();
     items.push(`داده ادتریس فقط از ${jLong(td[0])} تا ${jLong(td[td.length-1])} است؛ CPI و CPA فقط با هزینه همین روزها (${compact(costT)} ${esc(cur)}) حساب شده‌اند.`); }
-  if(!hasTracker){
+  const hasConv=rowsAll.some(r=>!CORE.includes(r.metric));
+  if(!hasTracker&&!hasConv){
     items.push(`داده ترکر (ادتریس) هنوز وارد نشده، پس نصب، CPI و CPA نمایش داده نمی‌شوند. از دکمه «وارد کردن خروجی ادتریس» فایل را انتخاب کنید.`);
-  } else {
+  } else if(hasTracker) {
     const paid=camps.filter(c=>c.cost>0);
     const paidInst=paid.reduce((s,c)=>s+c.inst,0);
     const freeInst=inst-paidInst;
@@ -856,9 +860,15 @@ function renderSummary(info,recs,idx,rowsAll){
     const zero=paid.filter(c=>c.inst===0).sort((a,b)=>b.cost-a.cost);
     if(zero.length){ const zc=zero.reduce((s,c)=>s+c.cost,0);
       items.push(`<b>${fa(zero.length)}</b> کمپین با مجموع <b>${compact(zc)} ${esc(cur)}</b> هزینه، هیچ نصبی در ترکر ندارند: ${zero.slice(0,5).map(c=>esc(c.name)).join("، ")}${zero.length>5?" و …":""}. یا نام کمپین در ترکر فرق دارد یا نصبی نیاورده‌اند.`); }
+  }
+  if(hasConv){
+    const paid=camps.filter(c=>c.cost>0);
     for(const e of S.events.slice(0,2)){
       const ce=paid.filter(c=>(c.a.s[e]||0)>0).map(c=>({...c,n:c.a.s[e],cpa:value(c.a,"cpa:"+e)})).sort((a,b)=>a.cpa-b.cpa);
-      if(ce.length) items.push(`رویداد «${esc(e)}»: مجموع ${fa(tot.s[e]||0)}، CPA کلی ${fa(value(tot,"cpa:"+e))}؛ بهترین کمپین <b>${esc(ce[0].name)}</b> با CPA ${fa(ce[0].cpa)}.`);
+      if(!ce.length) continue;
+      items.push(`${hasTracker?"رویداد ":""}«${esc(label(e))}»: مجموع ${fa(tot.s[e]||0)}، CPA کلی ${fa(value(tot,"cpa:"+e))}؛ بهترین کمپین <b>${esc(ce[0].name)}</b> با CPA ${fa(ce[0].cpa)}.`);
+      if(!hasTracker&&ce.length>1){ const most=[...ce].sort((a,b)=>b.n-a.n)[0], w=ce[ce.length-1];
+        items.push(`بیشترین «${esc(label(e))}» از <b>${esc(most.name)}</b> (${fa(most.n)})؛ گران‌ترین CPA: <b>${esc(w.name)}</b> با ${fa(w.cpa)}.`); }
     }
   }
   el.innerHTML=`<h2>نکته‌های کلیدی</h2><ul>${items.map(i=>`<li>${i}</li>`).join("")}</ul>`;
@@ -888,7 +898,7 @@ function renderKPIs(info,M,recs,prevRecs,hasPrev,span,from,to){
   const tiles=[];
   if(M.includes("cost")) tiles.push({m:"cost",k:"هزینه"});
   if(M.includes("installs")) tiles.push({m:"installs",k:"نصب",sub:"cpa:installs"});
-  for(const e of S.events) tiles.push({m:e,k:e,sub:M.includes("cpa:"+e)?"cpa:"+e:null});
+  for(const e of S.events) tiles.push({m:e,k:label(e),sub:M.includes("cpa:"+e)?"cpa:"+e:null});
   if(M.includes("clicks")) tiles.push({m:"clicks",k:"کلیک",sub:M.includes("cpc")?"cpc":null});
   if(M.includes("impressions")) tiles.push({m:"impressions",k:"نمایش",sub:M.includes("ctr")?"ctr":null});
   document.getElementById("kpis").innerHTML=tiles.map(t=>{
