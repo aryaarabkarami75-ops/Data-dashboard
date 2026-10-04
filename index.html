@@ -141,6 +141,7 @@ select{background:var(--bg);border:1px solid var(--ring);border-radius:8px;paddi
 /* the table scrolls inside its own box: header row, total row and the name column stay put */
 .tbl-scroll{overflow:auto;max-height:min(560px,72vh);overscroll-behavior:contain;border:1px solid var(--line);border-radius:10px}
 .tbl-tools{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.pubcamp{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}.pubcamp select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--ring);border-radius:8px;padding:6px 10px;max-width:220px}
 .search{display:flex;align-items:center;gap:6px;border:1px solid var(--ring);border-radius:8px;background:var(--bg);padding:4px 10px}
 .search input{border:0;background:transparent;outline:0;width:13em;font-size:13px}
 .search svg{width:14px;height:14px;opacity:.55;flex:none}
@@ -375,6 +376,7 @@ body.client .client-h{margin:8px 0 -4px;font-size:18px;font-weight:800}
         <button type="button" data-dim="source">کانال</button>
         <button type="button" data-dim="publisher" id="pubDimBtn">پابلیشر</button>
       </div>
+      <label class="pubcamp no-report" id="pubCampWrap" hidden><span>کمپین</span><select id="pubCamp" aria-label="کمپین در جدول پابلیشر"></select></label>
       <label class="search no-report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="tblSearch" type="search" placeholder="جستجو در سطرها" aria-label="جستجو در جدول"></label>
       <span class="note" id="tblCount"></span>
     </div>
@@ -491,7 +493,7 @@ function tableToObjects(rows){const h=rows[0].map(s=>s.trim());return rows.slice
 let DB = null;
 const S = Object.assign({
   client:null, from:null, to:null, preset:0, source:"", camps:null, events:null,
-  trendMetric:null, barMetric:null, scatterMetric:null, view:"trend", page:"dash", split:"total", gran:"day", tableDim:"campaign", sortKey:"cost", sortDir:-1
+  trendMetric:null, barMetric:null, scatterMetric:null, view:"trend", page:"dash", split:"total", gran:"day", tableDim:"campaign", pubCamp:"", sortKey:"cost", sortDir:-1
 }, store.get("state2", {}));
 let charts = {};
 /* charts are drawn at screen width; redraw them at page width when printing, or the PDF cuts them off */
@@ -758,7 +760,7 @@ function initControls(){
   new MutationObserver(()=>render()).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 }
 let tblQuery="";
-function pickClient(c){ if(c===S.client) return; S.client=c;S.camps=null;S.source="";S.events=null;S.from=S.to=null;S.trendMetric=S.barMetric=S.scatterMetric=null;
+function pickClient(c){ if(c===S.client) return; S.client=c;S.camps=null;S.pubCamp="";S.source="";S.events=null;S.from=S.to=null;S.trendMetric=S.barMetric=S.scatterMetric=null;
   const dv=String((DB.clients.find(x=>x.client===c)||{}).default_view||"").trim(); S.view=["trend","bar","scatter"].includes(dv)?dv:"trend";  /* clients tab column default_view, e.g. bar for clients read over the whole range */
   render(); }
 function pressed(sel,attr,val){document.querySelectorAll(sel+" button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset[attr]==String(val))));}
@@ -861,7 +863,14 @@ function render(){
   if(S.view==="bar") renderBar(recs,colors); else if(S.view==="scatter") renderScatter(recs,colors,info); else renderTrend(recs,colors,from,to);
   const pubAll=(DB.pubs||[]).filter(p=>p.client===S.client);
   const hasPub=pubAll.length>0; document.getElementById("pubDimBtn").hidden=!hasPub; if(!hasPub&&S.tableDim==="publisher") S.tableDim="campaign";
-  renderTable(S.tableDim==="publisher"?pubRecs(pubAll,from,to):recs,M,colors,idx);
+  /* publisher view: optional campaign picker, from the campaigns the tracker attributes to publishers in this range */
+  const pcOpts=[...new Set(pubAll.filter(p=>p.campaign&&p.date>=from&&p.date<=to).map(p=>ckey(p.campaign)))].sort();
+  if(S.pubCamp&&!pcOpts.includes(S.pubCamp)) S.pubCamp="";
+  const pcw=document.getElementById("pubCampWrap"); pcw.hidden=S.tableDim!=="publisher"||!pcOpts.length;
+  const pcs=document.getElementById("pubCamp");
+  pcs.innerHTML=`<option value="">همه کمپین‌ها</option>`+pcOpts.map(k=>`<option value="${esc(k)}"${k===S.pubCamp?" selected":""}>${esc(GROUP_NAME[k]||k)}</option>`).join("");
+  pcs.onchange=()=>{S.pubCamp=pcs.value;render();};
+  renderTable(S.tableDim==="publisher"?pubRecs(S.pubCamp?pubAll.filter(p=>p.campaign&&ckey(p.campaign)===S.pubCamp):pubAll,from,to):recs,M,colors,idx);
   renderTargetsBox(info,M);
   document.getElementById("tLegend").hidden=!Object.keys(TARGETS).length;
   const unit=info.currency?` مبالغ به ${info.currency}.`:"";
@@ -1060,7 +1069,7 @@ function renderTable(recs,M,colors,idx){
   const nameOf=r=>dim==="date"?jDow(r.k)+" "+jLong(r.k)+" "+r.k:dim==="source"?channelLabel(r.k):dim==="publisher"?r.k+" "+r.camps.join(" "):r.name+" "+channelLabel(r.ch);
   const total=rows.length;
   if(tblQuery) rows=rows.filter(r=>nameOf(r).toLowerCase().includes(tblQuery));
-  document.getElementById("tblCount").textContent=(tblQuery?`${fa(rows.length)} از ${fa(total)} سطر`:`${fa(total)} سطر`)+(dim==="publisher"?(pubCost?" · همه کمپین‌ها و کانال‌ها؛ هزینه از گزارش پابلیشر یکتانت":" · هزینه به تفکیک پابلیشر هنوز در شیت نیست؛ فعلاً نصب و رویدادها نمایش داده می‌شوند"):"");
+  document.getElementById("tblCount").textContent=(tblQuery?`${fa(rows.length)} از ${fa(total)} سطر`:`${fa(total)} سطر`)+(dim==="publisher"&&S.pubCamp?" · فقط "+(GROUP_NAME[S.pubCamp]||S.pubCamp)+"؛ هزینه یکتانت به تفکیک کمپین و پابلیشر در گزارش نیست، پس نصب و رویدادها نمایش داده می‌شوند":dim==="publisher"?(pubCost?" · همه کمپین‌ها و کانال‌ها؛ هزینه از گزارش پابلیشر یکتانت":" · هزینه به تفکیک پابلیشر هنوز در شیت نیست؛ فعلاً نصب و رویدادها نمایش داده می‌شوند"):"");
   const tot=aggregate(recs);
   const dimLabel={campaign:"کمپین",date:"روز",source:"کانال",publisher:"پابلیشر"}[dim];
   const keyCell=r=> dim==="date"?`${jDow(r.k)} ${jLong(r.k)}`: dim==="source"?esc(channelLabel(r.k)):dim==="publisher"?`<span dir="ltr" class="pub" title="${esc(r.k)}">${esc(r.k)}</span>${r.camps.length?`<span class="tag">${r.camps.length===1?esc(r.camps[0]):fa(r.camps.length)+" کمپین"}</span>`:""}`:`<span class="sw" style="background:${colors.map[r.k]}"></span>${esc(r.name)}<span class="tag">${esc(channelLabel(r.ch))}</span>`;
@@ -1320,14 +1329,14 @@ async function savePublishers(client,dmin,dmax){
   const note=document.getElementById("saveNote"); note.textContent="در حال ذخیره پابلیشرها…";
   const got=await sheetGet("publishers!A1:Z");
   let header=got.length&&got[0][0]==="date"?got[0].map(String):["date","client","source","publisher","campaign","cost","clicks","impressions","installs"];
-  const agg=new Map(), camp=new Map();
-  for(const o of IMP.result){ if(!o.pub) continue; const k=o.date+"\u0001"+o.pub;
+  /* one row per day, publisher and campaign, so the publisher table can be narrowed to one campaign */
+  const agg=new Map();
+  for(const o of IMP.result){ if(!o.pub) continue; const k=o.date+"\u0001"+o.pub+"\u0001"+(o.camp||"");
     let a=agg.get(k); if(!a){a={};agg.set(k,a);} a[o.metric]=(a[o.metric]||0)+o.v;
-    if(o.metric==="installs"){ let c=camp.get(k); if(!c){c={};camp.set(k,c);} c[o.camp]=(c[o.camp]||0)+o.v; }
     if(!header.includes(o.metric)) header.push(o.metric); }
   const kept=got.slice(1).filter(r=>!(r[1]===client&&r[2]==="adtrace"&&r[0]>=dmin&&r[0]<=dmax));
-  const add=[...agg].map(([k,a])=>{const [date,pub]=k.split("\u0001");const c=camp.get(k);const top=c?Object.entries(c).sort((x,y)=>y[1]-x[1])[0][0]:"";
-    return header.map(h=>h==="date"?date:h==="client"?client:h==="source"?"adtrace":h==="publisher"?pub:h==="campaign"?top:(a[h]||""));});
+  const add=[...agg].map(([k,a])=>{const [date,pub,cmp]=k.split("\u0001");
+    return header.map(h=>h==="date"?date:h==="client"?client:h==="source"?"adtrace":h==="publisher"?pub:h==="campaign"?cmp:(a[h]||""));});
   const all=[header,...kept,...add], W=header.length;
   for(const r of all) while(r.length<W) r.push("");
   while(all.length<got.length) all.push(Array(W).fill(""));
