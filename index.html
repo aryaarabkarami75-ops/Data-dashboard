@@ -418,7 +418,7 @@ const PAGE_SOURCE = document.documentElement.outerHTML;
 const LABELS = {
   cost:"هزینه", impressions:"نمایش", clicks:"کلیک", installs:"نصب",
   ctr:"CTR", cpc:"هزینه هر کلیک", "cpa:installs":"CPI",
-  sessions:"سشن", actions:"اقدام", sign_up:"ثبت‌نام", kyc_approved:"احراز هویت", purchase:"خرید", "cpa:actions":"هزینه هر اقدام", "cpa:sessions":"هزینه هر سشن"
+  sessions:"سشن", actions:"اقدام", sign_up:"ثبت‌نام", kyc_approved:"احراز هویت", purchase:"خرید", loan_request:"درخواست وام", "cpa:actions":"هزینه هر اقدام", "cpa:sessions":"هزینه هر سشن"
 };
 const SOURCE_LABELS = { yektanet:"یکتانت", "yektanet-cafe":"یکتانت (کافه‌بازار)", adtrace:"ادتریس", appmetrica:"اپ‌متریکا", metrix:"متریکس", ga4:"گوگل آنالیتیکس" };
 const CORE = ["cost","impressions","clicks"];
@@ -1092,7 +1092,7 @@ function savedReport(){
   return cands[0]||null;
 }
 const pctTxt=x=>fa(Math.abs(x)*100,0)+"٪";
-const evName=e=>({KYC:"احراز هویت (KYC)",Register:"ثبت‌نام",LogIn:"ورود",Login:"ورود","Deposit Request":"درخواست واریز",Deposit:"واریز",Buy:"خرید",Sell:"فروش",Withdraw:"برداشت",Purchase:"خرید",actions:"اقدام",sessions:"سشن",sign_up:"ثبت‌نام",kyc_approved:"احراز هویت (KYC)",purchase:"خرید"}[e]||e);
+const evName=e=>({KYC:"احراز هویت (KYC)",Register:"ثبت‌نام",LogIn:"ورود",Login:"ورود","Deposit Request":"درخواست واریز",Deposit:"واریز",Buy:"خرید",Sell:"فروش",Withdraw:"برداشت",Purchase:"خرید",actions:"اقدام",sessions:"سشن",sign_up:"ثبت‌نام",kyc_approved:"احراز هویت (KYC)",purchase:"خرید",loan_request:"درخواست وام"}[e]||e);
 /* draft text in a positive, client-facing tone, written from the numbers on screen */
 function draftReport(info,recs,prevRecs,hasPrev,from,to){
   const name=esc(info.display_name||S.client), cur=esc(info.currency||"تومان");
