@@ -874,7 +874,7 @@ function render(){
   const pcs=document.getElementById("pubCamp");
   pcs.innerHTML=`<option value="">همه کمپین‌ها</option>`+pcOpts.map(k=>`<option value="${esc(k)}"${k===S.pubCamp?" selected":""}>${esc(GROUP_NAME[k]||k)}</option>`).join("");
   pcs.onchange=()=>{S.pubCamp=pcs.value;render();};
-  renderTable(S.tableDim==="publisher"?pubRecs(S.pubCamp?pubAll.filter(p=>p.campaign&&ckey(p.campaign)===S.pubCamp):pubAll,from,to):recs,M,colors,idx);
+  renderTable(S.tableDim==="publisher"?pubRecs(S.pubCamp?pubAll.filter(p=>p.campaign&&ckey(p.campaign)===S.pubCamp):pubAll,from,to,recs,idx,S.pubCamp):recs,M,colors,idx);
   renderTargetsBox(info,M);
   document.getElementById("tLegend").hidden=!Object.keys(TARGETS).length;
   const unit=info.currency?` مبالغ به ${info.currency}.`:"";
@@ -1050,12 +1050,18 @@ function renderScatter(recs,colors,info){
       ctx.restore();}}]});
 }
 /* one record per day and publisher: cost from the ad network's publisher report, installs/events from the tracker */
-function pubRecs(pubs,from,to){
-  const map=new Map();
-  for(const p of pubs){ if(p.date<from||p.date>to) continue; const k=p.date+"|"+p.publisher;
-    let o=map.get(k); if(!o){o={date:p.date,pub:p.publisher,ck:"",campaign:"",camps:new Set(),channel:"",m:{}};map.set(k,o);}
+function pubRecs(pubs,from,to,recs,idx,camp){
+  /* channels whose cost has no per-publisher split (e.g. Cafe Bazaar): their tracker installs and their campaign cost
+     go on one row named after the channel, so the table's total cost and CPI match the cards above (Arya 2026-10-05) */
+  const chOf=c=>{const o=idx&&c?idx.get(ckey(c)):null;return o?o.channel:"";};
+  const lumped=ch=>!!ch&&ch!=="yektanet"&&!ch.startsWith("net:");
+  const map=new Map(), get=(date,pub)=>{const k=date+"|"+pub; let o=map.get(k); if(!o){o={date,pub,ck:"",campaign:"",camps:new Set(),channel:"",m:{}};map.set(k,o);} return o;};
+  for(const p of pubs){ if(p.date<from||p.date>to) continue; const ch=p.source!=="yektanet"?chOf(p.campaign):"";
+    const o=get(p.date,lumped(ch)?channelLabel(ch):p.publisher);
     if(p.campaign) o.camps.add(p.campaign);
     for(const m in p.m) o.m[m]=(o.m[m]||0)+p.m[m]; }
+  for(const r of recs||[]){ if(r.date<from||r.date>to||!lumped(r.channel)||!r.m.cost||(camp&&r.ck!==camp)) continue;
+    const o=get(r.date,channelLabel(r.channel)); o.camps.add(r.campaign); o.m.cost=(o.m.cost||0)+r.m.cost; }
   return [...map.values()];
 }
 function renderTable(recs,M,colors,idx){
