@@ -1175,20 +1175,25 @@ function renderReportPage(info,recs,prevRecs,hasPrev,span,from,to,M,brand){
   else if(REP.key!==k){ const sv=savedReport(); REP.key=k; REP.edited=!!sv; body.innerHTML=sv?cleanHtml(sv.html):draftReport(info,recs,prevRecs,hasPrev,from,to); repNote(sv?"متن ذخیره‌شده این بازه":""); }
   else if(!REP.edited&&document.activeElement!==body) body.innerHTML=draftReport(info,recs,prevRecs,hasPrev,from,to);
   REP.ctx=[info,recs,prevRecs,hasPrev,from,to];
-  /* daily installs with CPI line */
+  /* daily cost as bars, with a line per cost-per-result shown in the stats above (Arya 2026-10-05) */
   if(!window.Chart) return; chartBase();
   const days=[]; for(let d=from; d<=to; d=addDays(d,1)) days.push(d);
   const byDay={}; recs.forEach(r=>{(byDay[r.date]=byDay[r.date]||[]).push(r);});
-  const ac=accentColor(), hasI=M.includes("installs");
-  const ds=hasI?[{type:"bar",label:"نصب",data:days.map(d=>byDay[d]?aggregate(byDay[d]).s.installs||null:null),backgroundColor:alpha(ac,.75),borderRadius:4,yAxisID:"y",order:2},
-      {type:"line",label:"هزینه هر نصب",data:days.map(d=>byDay[d]?value(aggregate(byDay[d]),"cpa:installs"):null),borderColor:cssVar("--s2"),backgroundColor:cssVar("--s2"),borderWidth:2,tension:.3,pointRadius:3,spanGaps:true,yAxisID:"y2",order:1}]
-    : [{type:"bar",label:"هزینه",data:days.map(d=>byDay[d]?aggregate(byDay[d]).s.cost||null:null),backgroundColor:alpha(ac,.75),borderRadius:4,yAxisID:"y"}];
+  const ac=accentColor(), lineCols=["--s1","--s2","--s3","--s7","--s4"].map(cssVar).filter(c=>hueGap(c,ac)>40);
+  const cpas=stats.filter(([m])=>m.startsWith("cpa:")), hasI=cpas.length>0;
+  const ds=[{type:"bar",label:"هزینه",data:days.map(d=>byDay[d]?aggregate(byDay[d]).s.cost||null:null),backgroundColor:alpha(ac,.6),borderRadius:4,yAxisID:"y",order:2},
+    ...cpas.map(([m,k],i)=>({type:"line",label:k,data:days.map(d=>byDay[d]?value(aggregate(byDay[d]),m):null),borderColor:lineCols[i%lineCols.length],backgroundColor:lineCols[i%lineCols.length],borderWidth:2,tension:.3,pointRadius:3,spanGaps:true,yAxisID:"y2",order:1}))];
   charts.rep&&charts.rep.destroy();
   charts.rep=new Chart(document.getElementById("repChart"),{data:{labels:days.map(jShort),datasets:ds},
     options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:c=>` ${c.dataset.label}: ${fa(c.parsed.y)}`}}},
-      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:12}},y:{beginAtZero:true,grid:{color:cssVar("--line")},border:{display:false},ticks:{callback:v=>compact(v),maxTicksLimit:5}},
-        y2:{display:hasI,position:"right",beginAtZero:true,grid:{display:false},border:{display:false},ticks:{callback:v=>compact(v),maxTicksLimit:5}}}}});
+      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:12}},y:{beginAtZero:true,grid:{color:cssVar("--line")},border:{display:false},title:{display:true,text:"هزینه"+(cur?" ("+cur+")":"")},ticks:{callback:v=>compact(v),maxTicksLimit:5}},
+        y2:{display:hasI,position:"right",title:{display:hasI,text:cpas.length===1?cpas[0][1]:"هزینه هر نتیجه"},beginAtZero:true,grid:{display:false},border:{display:false},ticks:{callback:v=>compact(v),maxTicksLimit:5}}}}});
 }
+/* hue distance in degrees between two colours, so CPA lines never blend into the client's accent bars */
+function hueGap(a,b){ const h=c=>{ const x=document.createElement("canvas").getContext("2d"); x.fillStyle=c; const v=x.fillStyle; if(!/^#/.test(v)) return 0;
+  const [r,g,bb]=[1,3,5].map(i=>parseInt(v.slice(i,i+2),16)/255), mx=Math.max(r,g,bb), mn=Math.min(r,g,bb), d=mx-mn; if(!d) return 0;
+  return (mx===r?((g-bb)/d)%6:mx===g?(bb-r)/d+2:(r-g)/d+4)*60; };
+  const d=Math.abs(((h(a)-h(b))%360+360)%360); return Math.min(d,360-d); }
 function repNote(t){ const n=document.getElementById("repNote"); if(n) n.textContent=t||""; }
 function initReportEditor(){
   const body=document.getElementById("repBody");
