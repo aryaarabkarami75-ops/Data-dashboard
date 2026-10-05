@@ -663,9 +663,12 @@ function pivot(rows, idx){
 }
 function aggregate(recs){
   const s={}, ctrC={c:0,i:0}, cpcC={cost:0,c:0}; let costT=0; const costBy={};
+  /* the Winzy-style split (each member's cost pays only for its own result) applies inside one campaign;
+     any total across campaigns divides all cost by the results (Arya 2026-10-05: overall CPI must use all cost) */
+  const oneCamp=new Set(recs.map(o=>o.ck)).size<=1;
   for(const o of recs){ for(const k in o.m) s[k]=(s[k]||0)+o.m[k];
     if(TRACK_DATES.has(o.date)){ costT+=o.m.cost||0; /* a grouped campaign pays for each earmarked result with only that member's cost */
-      for(const k in o.m) if(k.startsWith("cost>")) costBy[k.slice(5)]=(costBy[k.slice(5)]||0)+o.m[k]-(o.m.cost||0); }
+      if(oneCamp) for(const k in o.m) if(k.startsWith("cost>")) costBy[k.slice(5)]=(costBy[k.slice(5)]||0)+o.m[k]-(o.m.cost||0); }
     if((o.m.impressions||0)>0){ctrC.c+=o.m.clicks||0;ctrC.i+=o.m.impressions;}
     if("clicks" in o.m){cpcC.cost+=o.m.cost||0;cpcC.c+=o.m.clicks;} }
   return {s,ctrC,cpcC,costT,costBy};
