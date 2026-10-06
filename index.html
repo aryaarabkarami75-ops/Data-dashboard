@@ -611,7 +611,7 @@ async function boot(){
 let TARGETS={};
 function parseTargets(txt){const o={};String(txt||"").split(/[;\n]/).forEach(p=>{const i=p.lastIndexOf("=");if(i<0)return;const k=p.slice(0,i).trim(),v=parseFloat(p.slice(i+1).replace(/[,٬]/g,"").replace(/[۰-۹]/g,d=>FA_D.indexOf(d)));if(k&&v>0)o[k]=v;});return o;}
 const serTargets=o=>Object.entries(o).map(([k,v])=>`${k}=${v}`).join("; ");
-const higherBetter = m => m==="ctr";
+const higherBetter = m => m==="ctr"||m.startsWith("cr:");
 /* how far a value is from its target: <1 better, >1 worse */
 function tRatio(m,v){const t=TARGETS[m]; if(!t||v==null||!isFinite(v)) return null; return higherBetter(m)? (v? t/v : Infinity) : v/t;}
 function tStyle(m,v){ const r=tRatio(m,v); if(r==null) return "";
@@ -677,6 +677,7 @@ function value(agg,m){
   const s=agg.s;
   if(m==="ctr") return agg.ctrC.i? agg.ctrC.c/agg.ctrC.i : null;
   if(m==="cpc") return agg.cpcC.c? agg.cpcC.cost/agg.cpcC.c : null;
+  if(m.startsWith("cr:")){const e=s[m.slice(3)]||0, i=s.installs||0; return i? e/i : null;}
   /* CPI/CPA only count cost from days the tracker has data for, so a short tracker export does not inflate them */
   if(m.startsWith("cpa:")){const ev=m.slice(4), e=s[ev], c=agg.costT+(agg.costBy[ev]||0); return e&&c?c/e:null;}
   return (m in s) ? s[m] : null;
@@ -684,11 +685,12 @@ function value(agg,m){
 function label(m){
   if(LABELS[m]) return LABELS[m];
   if(m.startsWith("cpa:")) return "CPA "+label(m.slice(4));
+  if(m.startsWith("cr:")) return "نرخ "+label(m.slice(3));
   return m;
 }
 const isCostLike = m => m==="cost"||m==="cpc"||m.startsWith("cpa:");
-const fmt = (m,v) => m==="ctr" ? faPct(v) : fa(v,0);
-const fmtShort = (m,v) => m==="ctr" ? faPct(v) : compact(v);
+const fmt = (m,v) => m==="ctr"||m.startsWith("cr:") ? faPct(v) : fa(v,0);
+const fmtShort = (m,v) => m==="ctr"||m.startsWith("cr:") ? faPct(v) : compact(v);
 function eventsOf(rows){
   const tot={}; rows.forEach(r=>{ if(!NOT_EVENTS.has(r.metric)) tot[r.metric]=(tot[r.metric]||0)+r.value; });
   return Object.keys(tot).sort((a,b)=>tot[b]-tot[a]);
@@ -1072,14 +1074,16 @@ function renderTable(recs,M,colors,idx){
   const pubCost=dim==="publisher"&&recs.some(r=>r.m.cost);
   const keys=[...new Set(recs.map(keyOf))];
   /* without cost per publisher, cost-based columns would all be blank, so they are left out */
-  const cols=dim==="publisher"&&!pubCost?M.filter(m=>!isCostLike(m)&&!["ctr","clicks","impressions"].includes(m)):M;
+  let cols=dim==="publisher"&&!pubCost?M.filter(m=>!isCostLike(m)&&!["ctr","clicks","impressions"].includes(m)):M;
+  /* no cost per publisher for one campaign, so rank publishers by quality instead: each event as a share of installs (Arya 2026-10-06) */
+  if(dim==="publisher"&&!pubCost&&cols.includes("installs")) cols=cols.flatMap(m=>m!=="installs"&&!m.startsWith("cr:")&&S.events.includes(m)?[m,"cr:"+m]:[m]);
   let rows=keys.map(k=>{const sub=recs.filter(r=>keyOf(r)===k);const a=aggregate(sub);return {k,name:dim==="campaign"?sub[0].campaign:k,ch:sub[0].channel,camps:[...new Set(sub.flatMap(r=>r.camps?[...r.camps]:[r.campaign]).filter(Boolean))],vals:Object.fromEntries(cols.map(m=>[m,value(a,m)]))};});
   const sk=cols.includes(S.sortKey)||S.sortKey==="key"?S.sortKey:(cols.includes("cost")?"cost":cols[0]);
   rows.sort((a,b)=> sk==="key" ? (a.name<b.name?-1:1)*S.sortDir : ((a.vals[sk]??-Infinity)-(b.vals[sk]??-Infinity))*S.sortDir);
   const nameOf=r=>dim==="date"?jDow(r.k)+" "+jLong(r.k)+" "+r.k:dim==="source"?channelLabel(r.k):dim==="publisher"?r.k+" "+r.camps.join(" "):r.name+" "+channelLabel(r.ch);
   const total=rows.length;
   if(tblQuery) rows=rows.filter(r=>nameOf(r).toLowerCase().includes(tblQuery));
-  document.getElementById("tblCount").textContent=(tblQuery?`${fa(rows.length)} از ${fa(total)} سطر`:`${fa(total)} سطر`)+(dim==="publisher"&&S.pubCamp?" · فقط "+(GROUP_NAME[S.pubCamp]||S.pubCamp)+"؛ هزینه یکتانت به تفکیک کمپین و پابلیشر در گزارش نیست، پس نصب و رویدادها نمایش داده می‌شوند":dim==="publisher"?(pubCost?" · همه کمپین‌ها و کانال‌ها؛ هزینه از گزارش پابلیشر یکتانت":" · هزینه به تفکیک پابلیشر هنوز در شیت نیست؛ فعلاً نصب و رویدادها نمایش داده می‌شوند"):"");
+  document.getElementById("tblCount").textContent=(tblQuery?`${fa(rows.length)} از ${fa(total)} سطر`:`${fa(total)} سطر`)+(dim==="publisher"&&S.pubCamp?" · فقط "+(GROUP_NAME[S.pubCamp]||S.pubCamp)+"؛ هزینه یکتانت به تفکیک کمپین و پابلیشر در گزارش نیست، پس نصب، رویدادها و نرخ تبدیل (رویداد ÷ نصب) نمایش داده می‌شوند":dim==="publisher"?(pubCost?" · همه کمپین‌ها و کانال‌ها؛ هزینه از گزارش پابلیشر یکتانت":" · هزینه به تفکیک پابلیشر هنوز در شیت نیست؛ فعلاً نصب و رویدادها نمایش داده می‌شوند"):"");
   const tot=aggregate(recs);
   const dimLabel={campaign:"کمپین",date:"روز",source:"کانال",publisher:"پابلیشر"}[dim];
   const keyCell=r=> dim==="date"?`${jDow(r.k)} ${jLong(r.k)}`: dim==="source"?esc(channelLabel(r.k)):dim==="publisher"?`<span dir="ltr" class="pub" title="${esc(r.k)}">${esc(r.k)}</span>${r.camps.length?`<span class="tag">${r.camps.length===1?esc(r.camps[0]):fa(r.camps.length)+" کمپین"}</span>`:""}`:`<span class="sw" style="background:${colors.map[r.k]}"></span>${esc(r.name)}<span class="tag">${esc(channelLabel(r.ch))}</span>`;
