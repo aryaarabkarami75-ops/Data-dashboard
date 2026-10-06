@@ -987,7 +987,10 @@ function tooltipBase(){ return {rtl:true,textDirection:"rtl",backgroundColor:css
 function renderTrend(recs,colors,from,to){
   const m=S.trendMetric;
   document.getElementById("chartTitle").textContent=`روند ${label(m)}`+(S.gran==="week"?" (هفتگی، از شنبه)":"");
-  chartNote("");
+  /* days with no file loaded break the line instead of being drawn through */
+  const have=new Set(recs.map(r=>r.date)), ds=[...have].sort(), miss=[];
+  if(ds.length) for(let d=ds[0]; d<=ds[ds.length-1]; d=addDays(d,1)) if(!have.has(d)) miss.push(d);
+  chartNote(miss.length?`برای ${miss.map(jShort).join("، ")} داده‌ای ثبت نشده است.`:"");
   if(!window.Chart) return;
   chartBase();
   const buckets=[]; for(let d=from; d<=to; d=addDays(d,1)){const k=bucketOf(d); if(!buckets.includes(k)) buckets.push(k);}
@@ -1000,7 +1003,7 @@ function renderTrend(recs,colors,from,to){
     if(rest.length) groups.push({name:"سایر",color:cssVar("--other"),f:r=>rest.includes(r.ck)}); }
   const datasets=groups.map(g=>({label:g.name,borderColor:g.color,backgroundColor:g.color,
     data:buckets.map(k=>{const sub=recs.filter(r=>bucketOf(r.date)===k&&g.f(r));return sub.length?value(aggregate(sub),m):null;}),
-    borderWidth:2.2,pointRadius:buckets.length>40?0:3,pointHoverRadius:6,tension:.3,spanGaps:true,
+    borderWidth:2.2,pointRadius:buckets.length>40?0:3,pointHoverRadius:6,tension:.3,spanGaps:false,
     fill:S.split==="total"?{target:"origin",above:alpha(g.color,.12)}:false}));
   const tl=TARGETS[m];
   if(tl&&S.split==="total") datasets.push({label:"هدف",data:buckets.map(()=>tl),borderColor:cssVar("--good"),borderDash:[6,5],borderWidth:1.5,pointRadius:0,fill:false});
@@ -1196,7 +1199,7 @@ function renderReportPage(info,recs,prevRecs,hasPrev,span,from,to,M,brand){
   const ac=accentColor(), lineCols=["--s1","--s2","--s3","--s7","--s4"].map(cssVar).filter(c=>hueGap(c,ac)>40);
   const cpas=stats.filter(([m])=>m.startsWith("cpa:")), hasI=cpas.length>0;
   const ds=[{type:"bar",label:"هزینه",data:days.map(d=>byDay[d]?aggregate(byDay[d]).s.cost||null:null),backgroundColor:alpha(ac,.6),borderRadius:4,yAxisID:"y",order:2},
-    ...cpas.map(([m,k],i)=>({type:"line",label:k,data:days.map(d=>byDay[d]?value(aggregate(byDay[d]),m):null),borderColor:lineCols[i%lineCols.length],backgroundColor:lineCols[i%lineCols.length],borderWidth:2,tension:.3,pointRadius:3,spanGaps:true,yAxisID:"y2",order:1}))];
+    ...cpas.map(([m,k],i)=>({type:"line",label:k,data:days.map(d=>byDay[d]?value(aggregate(byDay[d]),m):null),borderColor:lineCols[i%lineCols.length],backgroundColor:lineCols[i%lineCols.length],borderWidth:2,tension:.3,pointRadius:3,spanGaps:false,yAxisID:"y2",order:1}))];
   charts.rep&&charts.rep.destroy();
   charts.rep=new Chart(document.getElementById("repChart"),{data:{labels:days.map(jShort),datasets:ds},
     options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:c=>` ${c.dataset.label}: ${fa(c.parsed.y)}`}}},
