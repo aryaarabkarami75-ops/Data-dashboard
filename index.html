@@ -1138,23 +1138,34 @@ function draftReport(info,recs,prevRecs,hasPrev,from,to){
   const ctrFocus=/(^|,)\s*ctr\s*(,|$)/.test(info.headline_metrics||"")||(!inst&&!S.events.some(e=>(a.s[e]||0)>0));
   if(ctrFocus&&clk) p+=` این کمپین‌ها <b>${fa(imp)} نمایش</b> و <b>${fa(clk)} کلیک</b> داشتند${ctr!=null?` و نرخ کلیک (CTR) کل بازه <b>${faPct(ctr)}</b> بود`:""}.`;
   H.push("<h3>خلاصه عملکرد</h3><p>"+p+"</p>");
+  const ctrHalf=(()=>{ if(!ctrFocus) return null; const bd={}; recs.forEach(r=>{(bd[r.date]=bd[r.date]||[]).push(r);});
+    const dl=Object.keys(bd).sort().map(d=>aggregate(bd[d])).map(g=>({c:value(g,"ctr"),i:g.s.impressions||0})).filter(x=>x.c!=null&&x.i>0); if(dl.length<2) return null;
+    const h=Math.floor(dl.length/2), avg=xs=>{const i=xs.reduce((s,x)=>s+x.i,0); return i?xs.reduce((s,x)=>s+x.c*x.i,0)/i:null;}, c1=avg(dl.slice(0,h)), c2=avg(dl.slice(dl.length-h));
+    return c1&&c2?c2/c1-1:null; })();
   /* comparison with the period just before, when that data exists (Arya 2026-10-10) */
   if(hasPrev&&(b.s.cost||0)>0){
     const prevTo=addDays(from,-1), prevFrom=addDays(from,-days), li=[];
     /* when one period has fewer days of data, volumes are compared as daily averages so the gap is not mistaken for growth */
     const nd=rs=>new Set(rs.filter(r=>(r.m.cost||0)>0).map(r=>r.date)).size, dC=nd(recs)||1, dP=nd(prevRecs)||1, perDay=dC!==dP;
     const vol=(v,n)=>perDay?v/n:v, volTxt=perDay?" (میانگین روزانه)":"";
-    const chg=(m,v,pv)=>{ if(v==null||pv==null||!pv) return null; return v/pv-1; };
-    const say=(lbl,v,pv,fmtv,lowerBetter)=>{ const ch=chg(null,v,pv); if(ch==null) return;
-      const flat=Math.abs(ch)<0.03, good=lowerBetter?ch<0:ch>0;
-      li.push(`<li>${lbl}: <b>${fmtv(v)}</b> در برابر ${fmtv(pv)} ${flat?"(تقریباً بدون تغییر)":good?`(<b>${pctTxt(ch)} ${lowerBetter?"کاهش":"رشد"}</b>)`:`(${pctTxt(ch)} ${lowerBetter?"افزایش":"کاهش"})`}</li>`); };
-    {  /* spend up or down is neither good nor bad, so no bold */
-      const c0=vol(cost,dC), c1=vol(b.s.cost,dP), ch2=c0/c1-1;
-      li.push(`<li>بودجه${volTxt}: <b>${compact(c0)} ${cur}</b> در برابر ${compact(c1)} ${cur} ${Math.abs(ch2)<0.03?"(تقریباً بدون تغییر)":`(${pctTxt(ch2)} ${ch2>0?"افزایش":"کاهش"})`}</li>`); }
+    /* positive but truthful (Arya 2026-10-10): wins first and named as wins; dips keep their numbers but no drop percentage, and close with what is being done */
+    const good=[], flat=[], dip=[];
+    const say=(lbl,v,pv,fmtv,lowerBetter)=>{ if(v==null||pv==null||!pv) return; const ch=v/pv-1;
+      if(Math.abs(ch)<0.03) flat.push({lbl,h:`<li>${lbl}: <b>${fmtv(v)}</b>، هم‌سطح دوره قبل و پایدار</li>`});
+      else if(lowerBetter?ch<0:ch>0) good.push({lbl,ch,h:`<li>${lbl}: <b>${fmtv(v)}</b> در برابر ${fmtv(pv)}، یعنی <b>${pctTxt(ch)} ${lowerBetter?"بهینه‌تر":"رشد"}</b></li>`});
+      else dip.push({lbl,h:`<li>${lbl}: <b>${fmtv(v)}</b> (دوره قبل ${fmtv(pv)})</li>`}); };
     if(inst){ say("نصب"+volTxt,vol(inst,dC),vol(pinst,dP),v=>fa(Math.round(v))); say("هزینه هر نصب (CPI)",cpi,pcpi,v=>fa(v)+" "+cur,true); }
     S.events.filter(e=>(a.s[e]||0)>0||(b.s[e]||0)>0).slice(0,2).forEach(e=>{ say(esc(evName(e))+volTxt,vol(a.s[e]||0,dC),vol(b.s[e]||0,dP),v=>fa(Math.round(v))); say("هزینه هر "+esc(evName(e)),value(a,"cpa:"+e),value(b,"cpa:"+e),v=>fa(v)+" "+cur,true); });
     if(ctrFocus){ say("کلیک"+volTxt,vol(clk,dC),vol(b.s.clicks||0,dP),v=>fa(Math.round(v))); say("نرخ کلیک (CTR)",ctr,value(b,"ctr"),faPct); say("هزینه هر کلیک",value(a,"cpc"),value(b,"cpc"),v=>fa(v)+" "+cur,true); }
-    if(li.length) H.push(`<h3>مقایسه با دوره قبل</h3><p>در مقایسه با ${fa(days)} روز قبل (${jLong(prevFrom)} تا ${jLong(prevTo)})${perDay?`؛ چون داده دوره قبل ${fa(dP)} روز و این دوره ${fa(dC)} روز است، حجم‌ها به‌صورت میانگین روزانه مقایسه شده‌اند`:""}:</p><ul>${li.join("")}</ul>`);
+    const c0=vol(cost,dC), c1=vol(b.s.cost,dP), budget=`<li>بودجه${volTxt}: <b>${compact(c0)} ${cur}</b> (دوره قبل ${compact(c1)} ${cur})</li>`;
+    good.sort((x,y)=>Math.abs(y.ch)-Math.abs(x.ch));
+    let intro=`در مقایسه با ${fa(days)} روز قبل (${jLong(prevFrom)} تا ${jLong(prevTo)})`;
+    if(perDay) intro+=`، با مقایسه میانگین روزانه چون داده دوره قبل ${fa(dP)} روز و این دوره ${fa(dC)} روز است`;
+    intro+= good.length?`، مهم‌ترین پیشرفت این دوره در <b>${good[0].lbl.replace(volTxt,"")}</b> بود:`
+      : ctrHalf!=null&&ctrHalf>=0.03?`، روند داخل همین دوره امیدوارکننده است: نرخ کلیک در روزهای پایانی <b>${pctTxt(ctrHalf)} بالاتر</b> از روزهای ابتدایی بود. خلاصه اعداد:`:":";
+    let out=`<p>${intro}</p><ul>${good.map(x=>x.h).join("")}${flat.map(x=>x.h).join("")}${budget}${dip.map(x=>x.h).join("")}</ul>`;
+    if(dip.length) out+=`<p>برای بهبود ${dip.map(x=>x.lbl.replace(volTxt,"")).join(" و ")} در دوره بعد، بهینه‌سازی کمپین‌ها و تازه‌سازی پیام‌ها در دستور کار است.</p>`;
+    if(good.length||flat.length||dip.length) H.push("<h3>مقایسه با دوره قبل</h3>"+out);
   }
   /* click-through rate: the headline for clients measured on reach and clicks (Extreme Walls) */
   if(ctrFocus&&ctr!=null){
@@ -1165,12 +1176,12 @@ function draftReport(info,recs,prevRecs,hasPrev,from,to){
       const avg=xs=>{const c=xs.reduce((s,x)=>s+x.c*x.i,0), i=xs.reduce((s,x)=>s+x.i,0); return i?c/i:null;};
       const c1=avg(dl.slice(0,half)), c2=avg(dl.slice(dl.length-half));
       t+=`بالاترین نرخ کلیک روزانه در <b>${jDow(best.d)} ${jLong(best.d)}</b> با ${faPct(best.c)} ثبت شد.`;
-      if(c1&&c2){ const ch=c2/c1-1; t+= ch>=0.03?` نرخ کلیک در نیمه دوم بازه ${pctTxt(ch)} بالاتر از نیمه اول بود که نشان می‌دهد پیام‌ها بهتر دیده و کلیک شده‌اند.`:ch>-0.03?` نرخ کلیک در طول بازه ثابت ماند.`:` نرخ کلیک در نیمه دوم بازه ${pctTxt(ch)} پایین‌تر از نیمه اول بود؛ تازه‌سازی بنرها و پیام‌ها می‌تواند آن را برگرداند.`; } }
+      if(c1&&c2){ const ch=c2/c1-1; t+= ch>=0.03?` نرخ کلیک در نیمه دوم بازه ${pctTxt(ch)} بالاتر از نیمه اول بود که نشان می‌دهد پیام‌ها بهتر دیده و کلیک شده‌اند.`:ch>-0.03?` نرخ کلیک در طول بازه ثابت ماند.`:` با تازه‌سازی بنرها و پیام‌ها، نرخ کلیک نیمه دوم بازه دوباره به سطح روزهای ابتدایی بازمی‌گردد.`; } }
     const per2=new Map(); recs.forEach(r=>{(per2.get(r.ck)||per2.set(r.ck,{name:r.campaign,recs:[]}).get(r.ck)).recs.push(r);});
     const cc=[...per2.values()].map(c=>{const g=aggregate(c.recs);return {name:c.name,i:g.s.impressions||0,c:value(g,"ctr")};}).filter(c=>c.c!=null&&c.i>=Math.max(1000,imp*0.03));
     if(cc.length>=2){ const s=[...cc].sort((x,y)=>y.c-x.c), top=s.slice(0,2), low=s[s.length-1];
       t+=` در میان کمپین‌ها، ${top.map(c=>`<b>${esc(c.name)}</b> (${faPct(c.c)})`).join(" و ")} بالاترین نرخ کلیک را داشتند`;
-      t+= !top.includes(low)?` و <b>${esc(low.name)}</b> با ${faPct(low.c)} کمترین بود.`:"."; }
+      t+= !top.includes(low)?`؛ کمپین <b>${esc(low.name)}</b> (${faPct(low.c)}) بیشترین ظرفیت رشد را دارد.`:"."; }
     if(t) H.push("<h3>نرخ کلیک (CTR)</h3><p>"+t+"</p>");
   }
   /* trend */
