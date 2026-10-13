@@ -425,8 +425,12 @@ const PAGE_SOURCE = document.documentElement.outerHTML;
 const LABELS = {
   cost:"هزینه", impressions:"نمایش", clicks:"کلیک", installs:"نصب",
   ctr:"CTR", cpc:"هزینه هر کلیک", "cpa:installs":"CPI",
-  sessions:"سشن", actions:"اقدام", sign_up:"ثبت‌نام", kyc_approved:"احراز هویت", purchase:"خرید", loan_request:"درخواست وام", "cpa:actions":"هزینه هر اقدام", "cpa:sessions":"هزینه هر سشن"
+  sessions:"سشن", actions:"اقدام", sign_up:"ثبت‌نام", kyc_approved:"احراز هویت", purchase:"خرید", loan_request:"درخواست وام", "cpa:actions":"هزینه هر اقدام", "cpa:sessions":"هزینه هر سشن",
+  conv:"اقدام/ثبت‌نام (ترکیبی)", "cpa:conv":"هزینه هر اقدام/ثبت‌نام"
 };
+/* a client whose tracked event changed: one combined metric ("key") takes the old event before the switch date and the new one from it,
+   so both periods compare on one line; charts of it mark the switch (Arya 2026-10-13: Gvest moved from tag "actions" to "sign_up" on 19 Mehr) */
+const METRIC_SWITCH = { Gvest:{key:"conv", from:"actions", to:"sign_up", at:"2026-10-11"} };
 const SOURCE_LABELS = { yektanet:"یکتانت", "yektanet-cafe":"یکتانت (کافه‌بازار)", adtrace:"ادتریس", appmetrica:"اپ‌متریکا", metrix:"متریکس", ga4:"گوگل آنالیتیکس" };
 const CORE = ["cost","impressions","clicks"];
 const NOT_EVENTS = new Set(["cost","impressions","clicks","installs"]);
@@ -644,7 +648,16 @@ async function saveTargets(info){
   }catch(e){ note.textContent=(e&&e.code&&ERR_COPY[e.code])||("ذخیره نشد"+(e&&e.message?": "+e.message:"")); }
 }
 function clientInfo(){return DB.clients.find(c=>c.client===S.client)||{client:S.client,display_name:S.client,currency:"",headline_metrics:""};}
-function clientRows(){return DB.rows.filter(r=>r.client===S.client);}
+function clientRows(){ const rows=DB.rows.filter(r=>r.client===S.client), sw=METRIC_SWITCH[S.client]; if(!sw) return rows;
+  return rows.concat(rows.filter(r=>r.metric===(r.date<sw.at?sw.from:sw.to)).map(r=>({...r,metric:sw.key}))); }
+/* the switch marker and note for a chart of metric m over from..to, or null */
+function switchFor(m,from,to){ const sw=METRIC_SWITCH[S.client]; if(!sw||(m!==sw.key&&m!=="cpa:"+sw.key)||sw.at<=from||sw.at>to) return null;
+  return {...sw, note:`از ${jLong(sw.at)} رویداد اندازه‌گیری از «${label(sw.from)}» (تگ قبلی) به «${label(sw.to)}» تغییر کرد. این نمودار تا قبل از آن روز «${label(sw.from)}» و از آن روز «${label(sw.to)}» را در یک خط نشان می‌دهد؛ خط‌چین عمودی روز تغییر است.`}; }
+/* Chart.js plugin: dashed vertical line with a caption at label index i */
+function switchLine(i,text){ return {id:"switchLine",afterDatasetsDraw(ch){ if(i==null||i<0) return; const x=ch.scales.x.getPixelForValue(i), a=ch.chartArea, c=ch.ctx;
+  c.save(); c.strokeStyle=cssVar("--ink-2"); c.setLineDash([5,4]); c.lineWidth=1.4; c.beginPath(); c.moveTo(x,a.top); c.lineTo(x,a.bottom); c.stroke();
+  c.setLineDash([]); c.fillStyle=cssVar("--ink-2"); c.font="600 11px "+cssVar("--font"); c.textAlign=x>a.left+(a.right-a.left)/2?"right":"left"; c.textBaseline="top";
+  c.fillText(text, x+(c.textAlign==="left"?5:-5), a.top+2); c.restore(); }}; }
 const isTracker = src => src==="adtrace"||src==="appmetrica"||src==="metrix";
 /* one entry per campaign: display name and channel (the ad network that bills it, else the tracker's network) */
 function campaignIndex(rows){
@@ -820,7 +833,8 @@ function render(){
 
   /* events: default to the four most frequent */
   const events=eventsOf(rowsAll);
-  if(!S.events) S.events=(info.headline_metrics||"").split(",").map(s=>s.trim()).filter(e=>events.includes(e));
+  if(!S.events){ S.events=(info.headline_metrics||"").split(",").map(s=>s.trim()).filter(e=>events.includes(e));
+    const sw=METRIC_SWITCH[S.client]; if(sw&&events.includes(sw.key)) S.events=[sw.key,...S.events.filter(e=>e!==sw.key)]; }
   if(!S.events.length) S.events=events.slice(0,4);
   S.events=S.events.filter(e=>events.includes(e));
   document.getElementById("eventField").hidden=!events.length;
@@ -994,7 +1008,8 @@ function renderTrend(recs,colors,from,to){
   /* days with no file loaded break the line instead of being drawn through */
   const have=new Set(recs.map(r=>r.date)), ds=[...have].sort(), miss=[];
   if(ds.length) for(let d=ds[0]; d<=ds[ds.length-1]; d=addDays(d,1)) if(!have.has(d)) miss.push(d);
-  chartNote(miss.length?`برای ${miss.map(jShort).join("، ")} داده‌ای ثبت نشده است.`:"");
+  const sw=switchFor(m,from,to);
+  chartNote([sw&&sw.note, miss.length?`برای ${miss.map(jShort).join("، ")} داده‌ای ثبت نشده است.`:""].filter(Boolean).join(" "));
   if(!window.Chart) return;
   chartBase();
   const buckets=[]; for(let d=from; d<=to; d=addDays(d,1)){const k=bucketOf(d); if(!buckets.includes(k)) buckets.push(k);}
@@ -1011,7 +1026,7 @@ function renderTrend(recs,colors,from,to){
     fill:S.split==="total"?{target:"origin",above:alpha(g.color,.12)}:false}));
   const tl=TARGETS[m];
   if(tl&&S.split==="total") datasets.push({label:"هدف",data:buckets.map(()=>tl),borderColor:cssVar("--good"),borderDash:[6,5],borderWidth:1.5,pointRadius:0,fill:false});
-  mainChart({type:"line",
+  mainChart({type:"line",plugins:sw?[switchLine(buckets.indexOf(bucketOf(sw.at)),`تغییر تگ: ${label(sw.from)} ← ${label(sw.to)}`)]:[],
     data:{labels:buckets.map(k=>S.gran==="week"?"هفته "+jShort(k):jShort(k)),datasets},
     options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
       plugins:{legend:{display:datasets.length>1,position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},
@@ -1122,7 +1137,7 @@ function savedReport(){
   return cands[0]||null;
 }
 const pctTxt=x=>fa(Math.abs(x)*100,0)+"٪";
-const evName=e=>({KYC:"احراز هویت (KYC)",Register:"ثبت‌نام",LogIn:"ورود",Login:"ورود","Deposit Request":"درخواست واریز",Deposit:"واریز",Buy:"خرید",Sell:"فروش",Withdraw:"برداشت",Purchase:"خرید",actions:"اقدام",sessions:"سشن",sign_up:"ثبت‌نام",kyc_approved:"احراز هویت (KYC)",purchase:"خرید",loan_request:"درخواست وام"}[e]||e);
+const evName=e=>({KYC:"احراز هویت (KYC)",Register:"ثبت‌نام",LogIn:"ورود",Login:"ورود","Deposit Request":"درخواست واریز",Deposit:"واریز",Buy:"خرید",Sell:"فروش",Withdraw:"برداشت",Purchase:"خرید",actions:"اقدام",sessions:"سشن",sign_up:"ثبت‌نام",kyc_approved:"احراز هویت (KYC)",purchase:"خرید",loan_request:"درخواست وام"}[e]||label(e));
 /* draft text in a positive, client-facing tone, written from the numbers on screen */
 function draftReport(info,recs,prevRecs,hasPrev,from,to){
   const name=esc(info.display_name||S.client), cur=esc(info.currency||"تومان");
@@ -1202,7 +1217,8 @@ function draftReport(info,recs,prevRecs,hasPrev,from,to){
   const evs=S.events.filter(e=>(a.s[e]||0)>0);
   if(evs.length){
     const li=evs.map(e=>{const c=value(a,"cpa:"+e); return `<li><b>${fa(a.s[e])}</b> ${esc(evName(e))}${c?`، با هزینه <b>${fa(c)} ${cur}</b> برای هر مورد`:""}</li>`;}).join("");
-    H.push(`<h3>اقدامات کاربران</h3><p>کاربرانی که از این کمپین‌ها جذب شدند، ${inst?"در اپلیکیشن ":""}این اقدامات را انجام دادند:</p><ul>${li}</ul>`);
+    const sw=evs.map(e=>switchFor(e,from,to)).find(Boolean);
+    H.push(`<h3>اقدامات کاربران</h3><p>کاربرانی که از این کمپین‌ها جذب شدند، ${inst?"در اپلیکیشن ":""}این اقدامات را انجام دادند:</p><ul>${li}</ul>`+(sw?`<p>از ${jLong(sw.at)} رویداد اندازه‌گیری از «${esc(label(sw.from))}» (تگ قبلی) به «${esc(label(sw.to))}» تغییر کرد. رقم «${esc(label(sw.key))}» تا قبل از آن روز «${esc(label(sw.from))}» و از آن روز «${esc(label(sw.to))}» را با هم جمع می‌زند تا دو دوره قابل مقایسه باشند.</p>`:""));
   }
   /* campaigns */
   const per=new Map(); recs.forEach(r=>{(per.get(r.ck)||per.set(r.ck,{name:r.campaign,recs:[]}).get(r.ck)).recs.push(r);});
@@ -1252,8 +1268,9 @@ function renderReportPage(info,recs,prevRecs,hasPrev,span,from,to,M,brand){
   const cpas=stats.filter(([m])=>m.startsWith("cpa:")), hasI=cpas.length>0;
   const ds=[{type:"bar",label:"هزینه",data:days.map(d=>byDay[d]?aggregate(byDay[d]).s.cost||null:null),backgroundColor:alpha(ac,.6),borderRadius:4,yAxisID:"y",order:2},
     ...cpas.map(([m,k],i)=>({type:"line",label:k,data:days.map(d=>byDay[d]?value(aggregate(byDay[d]),m):null),borderColor:lineCols[i%lineCols.length],backgroundColor:lineCols[i%lineCols.length],borderWidth:2,tension:.3,pointRadius:3,spanGaps:false,yAxisID:"y2",order:1}))];
+  const sw=cpas.map(([m])=>switchFor(m,from,to)).find(Boolean);
   charts.rep&&charts.rep.destroy();
-  charts.rep=new Chart(document.getElementById("repChart"),{data:{labels:days.map(jShort),datasets:ds},
+  charts.rep=new Chart(document.getElementById("repChart"),{plugins:sw?[switchLine(days.indexOf(sw.at),`تغییر تگ: ${label(sw.from)} ← ${label(sw.to)}`)]:[],data:{labels:days.map(jShort),datasets:ds},
     options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:c=>` ${c.dataset.label}: ${fa(c.parsed.y)}`}}},
       scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:12}},y:{beginAtZero:true,grid:{color:cssVar("--line")},border:{display:false},title:{display:true,text:"هزینه"+(cur?" ("+cur+")":"")},ticks:{callback:v=>compact(v),maxTicksLimit:5}},
         y2:{display:hasI,position:"right",title:{display:hasI,text:cpas.length===1?cpas[0][1]:"هزینه هر نتیجه"},beginAtZero:true,grid:{display:false},border:{display:false},ticks:{callback:v=>compact(v),maxTicksLimit:5}}}}});
