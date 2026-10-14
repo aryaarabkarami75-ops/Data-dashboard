@@ -431,7 +431,7 @@ const LABELS = {
 /* a client whose tracked event changed: one combined metric ("key") takes the old event before the switch date and the new one from it,
    so both periods compare on one line; charts of it mark the switch (Arya 2026-10-13: Gvest moved from tag "actions" to "sign_up" on 18 Mehr) */
 const METRIC_SWITCH = { Gvest:{key:"conv", from:"actions", to:"sign_up", at:"2026-10-10"} };
-const SOURCE_LABELS = { yektanet:"یکتانت", "yektanet-cafe":"یکتانت (کافه‌بازار)", adtrace:"ادتریس", appmetrica:"اپ‌متریکا", metrix:"متریکس", ga4:"گوگل آنالیتیکس" };
+const SOURCE_LABELS = { yektanet:"یکتانت", "yektanet-cafe":"یکتانت (کافه‌بازار)", adtrace:"ادتریس", appmetrica:"اپ‌متریکا", metrix:"متریکس", ga4:"گوگل آنالیتیکس", gsm:"پنل جی‌اس‌ام" };
 const CORE = ["cost","impressions","clicks"];
 const NOT_EVENTS = new Set(["cost","impressions","clicks","installs"]);
 const SERIES = ["--s1","--s2","--s3","--s4","--s5","--s6","--s7","--s8"];
@@ -664,7 +664,8 @@ function campaignIndex(rows){
   const idx=new Map();
   for(const r of rows){ const k=ckey(r.campaign);
     let o=idx.get(k); if(!o){o={key:k,name:GROUP_NAME[k]||r.campaign||k,channel:null,net:null,cost:0};idx.set(k,o);}
-    if(!isTracker(r.source)){ o.channel=r.source; o.name=GROUP_NAME[k]||r.campaign; if(r.metric==="cost") o.cost+=r.value; }
+    if(!isTracker(r.source)){ if(!o.channel||r.metric==="cost") o.channel=r.source;   /* the network that bills it, not a results-only source (GA4, client backend) */
+      o.name=GROUP_NAME[k]||r.campaign; if(r.metric==="cost") o.cost+=r.value; }
     else if(!o.net) o.net=r.campaign_id||r.source; }
   for(const o of idx.values()) if(!o.channel) o.channel="net:"+(o.net||"ناشناخته");
   return idx;
