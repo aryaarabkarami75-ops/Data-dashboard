@@ -1080,7 +1080,7 @@ function pubRecs(pubs,from,to,recs,idx,camp){
   /* channels whose cost has no per-publisher split (e.g. Cafe Bazaar): their tracker installs and their campaign cost
      go on one row named after the channel, so the table's total cost and CPI match the cards above (Arya 2026-10-05) */
   const chOf=c=>{const o=idx&&c?idx.get(ckey(c)):null;return o?o.channel:"";};
-  const lumped=ch=>!!ch&&ch!=="yektanet"&&!ch.startsWith("net:");
+  const lumped=ch=>!!ch&&ch!=="yektanet"&&ch!=="ga4"&&!ch.startsWith("net:");   /* GA4 publisher rows already name the site (Sarmayebazar) */
   const map=new Map(), get=(date,pub)=>{const k=date+"|"+pub; let o=map.get(k); if(!o){o={date,pub,ck:"",campaign:"",camps:new Set(),channel:"",m:{}};map.set(k,o);} return o;};
   for(const p of pubs){ if(p.date<from||p.date>to) continue; const ch=p.source!=="yektanet"?chOf(p.campaign):"";
     const o=get(p.date,lumped(ch)?channelLabel(ch):p.publisher);
