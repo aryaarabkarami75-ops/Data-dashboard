@@ -665,7 +665,8 @@ function campaignIndex(rows){
   for(const r of rows){ const k=ckey(r.campaign);
     let o=idx.get(k); if(!o){o={key:k,name:GROUP_NAME[k]||r.campaign||k,channel:null,net:null,cost:0};idx.set(k,o);}
     if(!isTracker(r.source)){ if(!o.channel||r.metric==="cost") o.channel=r.source;   /* the network that bills it, not a results-only source (GA4, client backend) */
-      o.name=GROUP_NAME[k]||r.campaign; if(r.metric==="cost") o.cost+=r.value; }
+      /* an aliased campaign is shown under its alias target's own name when a row carries it (Arya 2026-10-14: GSM loan100 -> loan200) */
+      if(!o.exact) o.name=GROUP_NAME[k]||r.campaign; if(normCamp(r.campaign)===k) o.exact=true; if(r.metric==="cost") o.cost+=r.value; }
     else if(!o.net) o.net=r.campaign_id||r.source; }
   for(const o of idx.values()) if(!o.channel) o.channel="net:"+(o.net||"ناشناخته");
   return idx;
