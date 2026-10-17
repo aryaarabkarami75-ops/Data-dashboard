@@ -278,6 +278,15 @@ html:has(body.special){scroll-behavior:smooth}
 .sp-score{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
 .sp-rank{font-size:12px;color:var(--muted)}
 .sp-h{margin:6px 4px -4px;font-size:16px;font-weight:800}
+.sp-split{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.sp-split>div{background:var(--accent-wash);border-radius:16px;padding:14px 16px}
+.sp-split h3{margin:0 0 8px;font-size:16px;color:var(--accent)}
+.sp-split .row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+.sp-split .row:last-child{border-bottom:0}
+.sp-split .row span{color:var(--ink-2)}
+.sp-split .row b{font-size:15px;font-variant-numeric:tabular-nums}
+.sp-split .row b small{font-size:11px;font-weight:500;color:var(--muted)}
+.sp-split .row i{grid-column:1/-1;height:4px;border-radius:2px;background:linear-gradient(to left,var(--accent) var(--w),color-mix(in srgb,var(--accent) 15%,transparent) var(--w))}
 .sp-foot{text-align:center;font-size:12px;color:var(--muted)}
 /* scroll reveal: cards rise in as they enter the screen */
 .rv{opacity:0;transform:translateY(26px) scale(.985);transition:opacity .7s var(--ease),transform .7s var(--ease);transition-delay:var(--d,0s)}
@@ -516,6 +525,11 @@ const LABELS = {
 /* a client whose tracked event changed: one combined metric ("key") takes the old event before the switch date and the new one from it,
    so both periods compare on one line; charts of it mark the switch (Arya 2026-10-13: Gvest moved from tag "actions" to "sign_up" on 18 Mehr) */
 const METRIC_SWITCH = { Gvest:{key:"conv", from:"actions", to:"sign_up", at:"2026-10-10"} };
+/* clients whose reports show channel sections instead of one line per campaign (Arya 2026-10-17: Daric = Cafe Bazaar and app ads) */
+const REPORT_SPLIT = { Daric:[{name:"کافه‌بازار",has:ch=>ch==="yektanet-cafe"},{name:"تبلیغات اپ",has:()=>true}] };
+function reportSplit(recs){ const def=REPORT_SPLIT[S.client]; if(!def) return null;
+  const out=def.map(d=>({name:d.name,recs:[]})); recs.forEach(r=>out[def.findIndex(d=>d.has(r.channel))].recs.push(r));
+  return out.filter(g=>g.recs.length).map(g=>({...g,a:aggregate(g.recs)})); }
 const SOURCE_LABELS = { yektanet:"یکتانت", "yektanet-cafe":"یکتانت (کافه‌بازار)", adtrace:"ادتریس", appmetrica:"اپ‌متریکا", metrix:"متریکس", ga4:"گوگل آنالیتیکس", gsm:"پنل جی‌اس‌ام" };
 const CORE = ["cost","impressions","clicks"];
 const NOT_EVENTS = new Set(["cost","impressions","clicks","installs"]);
@@ -1312,10 +1326,17 @@ function draftReport(info,recs,prevRecs,hasPrev,from,to){
     const sw=evs.map(e=>switchFor(e,from,to)).find(Boolean);
     H.push(`<h3>اقدامات کاربران</h3><p>کاربرانی که از این کمپین‌ها جذب شدند، ${inst?"در اپلیکیشن ":""}این اقدامات را انجام دادند:</p><ul>${li}</ul>`+(sw?`<p>از ${jLong(sw.at)} رویداد اندازه‌گیری از «${esc(label(sw.from))}» (تگ قبلی) به «${esc(label(sw.to))}» تغییر کرد. رقم «${esc(label(sw.key))}» تا قبل از آن روز «${esc(label(sw.from))}» و از آن روز «${esc(label(sw.to))}» را با هم جمع می‌زند تا دو دوره قابل مقایسه باشند.</p>`:""));
   }
+  /* channel sections in place of campaigns, for clients that want them */
+  const split=reportSplit(recs);
+  if(split){ const li=split.map(g=>{ const ci=value(g.a,"cpa:installs"), gi=g.a.s.installs||0, parts=[`هزینه <b>${compact(g.a.s.cost||0)} ${cur}</b>`];
+      if(gi) parts.push(`<b>${fa(gi)} نصب</b> (${pctTxt(gi/(inst||1))} از کل)`+(ci?` با CPI <b>${fa(ci)}</b>`:""));
+      evs.slice(0,2).forEach(e=>{ const n=g.a.s[e]||0, c=value(g.a,"cpa:"+e); if(n) parts.push(`${fa(n)} ${esc(evName(e))}`+(c?` (هر مورد ${fa(c)} ${cur})`:"")); });
+      return `<li><b>${esc(g.name)}</b>: ${parts.join("، ")}</li>`; }).join("");
+    H.push(`<h3>${split.map(g=>esc(g.name)).join(" و ")}</h3><ul>${li}</ul>`); }
   /* campaigns */
   const per=new Map(); recs.forEach(r=>{(per.get(r.ck)||per.set(r.ck,{name:r.campaign,recs:[]}).get(r.ck)).recs.push(r);});
   const camps=[...per.values()].map(c=>{const g=aggregate(c.recs);return {name:c.name,inst:g.s.installs||0,cpi:value(g,"cpa:installs"),g};}).filter(c=>c.inst>0&&c.cpi);
-  if(camps.length){
+  if(camps.length&&!split){
     const top=[...camps].sort((x,y)=>y.inst-x.inst).slice(0,3);
     let t=`<p>پرنتیجه‌ترین کمپین‌ها:</p><ul>${top.map(c=>`<li><b>${esc(c.name)}</b>: ${fa(c.inst)} نصب (${pctTxt(c.inst/(inst||1))} از کل) با CPI ${fa(c.cpi)}</li>`).join("")}</ul>`;
     const vol=camps.filter(c=>c.inst>=Math.max(10,inst*0.02)).sort((x,y)=>x.cpi-y.cpi)[0];
@@ -1326,7 +1347,9 @@ function draftReport(info,recs,prevRecs,hasPrev,from,to){
   }
   /* next steps */
   const steps=[];
-  const cheap=camps.filter(c=>c.inst>=Math.max(10,inst*0.02)).sort((x,y)=>x.cpi-y.cpi).slice(0,2);
+  const cheap=split?[]:camps.filter(c=>c.inst>=Math.max(10,inst*0.02)).sort((x,y)=>x.cpi-y.cpi).slice(0,2);
+  if(split){ const sb=split.map(g=>({name:g.name,c:value(g.a,"cpa:installs")})).filter(g=>g.c).sort((x,y)=>x.c-y.c);
+    if(sb.length>1) steps.push(`افزایش سهم بودجه ${esc(sb[0].name)} که نصب‌ها را با هزینه کمتری می‌آورد.`); }
   if(cheap.length) steps.push(`افزایش سهم بودجه کمپین‌های پربازده (${cheap.map(c=>esc(c.name)).join(" و ")}) برای جذب نصب بیشتر با همین هزینه.`);
   steps.push("بازبینی و بهینه‌سازی کمپین‌های کم‌بازده و انتقال بودجه آن‌ها به کانال‌های موفق‌تر.");
   if(evs.length) steps.push(`تمرکز بیشتر بر کیفیت کاربر و افزایش ${esc(evName(evs[0]))}${inst?" در کنار حجم نصب":""}.`);
@@ -1583,6 +1606,7 @@ function spLabel(m){ if(m.startsWith("rate:")){ const [n,d]=rateParts(m).map(x=>
 const spKind=m=>m==="ctr"||m.startsWith("cr:")||m.startsWith("rate:")?"p":m==="cost"?"c":"n";
 const SPF={n:v=>fa(Math.round(v)),c:v=>compact(v),p:v=>faPct(v)};
 const spFmt=(m,v)=>v==null||!isFinite(v)?"–":SPF[spKind(m)](v);
+const isRatio2=m=>m==="ctr"||m==="cpc"||m==="cpm"||m.startsWith("cpa:")||m.startsWith("cr:")||m.startsWith("rate:");
 function spVal(a,m){ if(m==="cpm"){ const i=a.s.impressions||0; return i?(a.s.cost||0)/i*1000:null; } return value(a,m); }
 const spUnit=(m,cur)=>isCostLike(m)||m==="cpm"?` <small>${cur}</small>`:"";
 const spNum=(m,v)=>`<span data-cu="${v}" data-f="${spKind(m)}">${spFmt(m,v)}</span>`;
@@ -1671,16 +1695,22 @@ function spOverview(c){
       ...cpas.map((m,i)=>({type:"line",label:spLabel(m),data:days.map(d=>byDay[d]?value(aggregate(byDay[d]),m):null),borderColor:lineCols[i%lineCols.length],backgroundColor:lineCols[i%lineCols.length],borderWidth:2.5,tension:.35,pointRadius:3,pointHoverRadius:6,yAxisID:"y2",order:1}))]},
     options:{interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:x=>` ${x.dataset.label}: ${fa(x.parsed.y)}`}}},
       scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:12}},y:spScale(null,{title:{display:true,text:"هزینه"+(cur?" ("+cur+")":"")}}),y2:spScale(null,{display:cpas.length>0,position:"right",grid:{display:false}})}}});
-  /* campaigns ranked by the main result */
+  /* channel sections for clients that want them, else campaigns ranked by the main result */
+  const split=reportSplit(recs);
   const r0=(a.s.installs||0)>0?"installs":S.events.find(e=>(a.s[e]||0)>0)||((a.s.clicks||0)>0?"clicks":"cost");
   const per=new Map(); recs.forEach(r=>{(per.get(r.ck)||per.set(r.ck,{name:r.campaign,recs:[]}).get(r.ck)).recs.push(r);});
-  const camps=[...per.values()].map(p=>{const g=aggregate(p.recs); return {name:p.name,n:g.s[r0]||0,c:r0==="cost"?null:spVal(g,r0==="clicks"?"cpc":"cpa:"+r0)};}).filter(x=>x.n>0).sort((x,y)=>y.n-x.n).slice(0,8);
+  const camps=[...per.values()].map(p=>{const g=aggregate(p.recs); return {name:p.name,n:g.s[r0]||0,c:r0==="cost"?null:spVal(g,r0==="clicks"?"cpc":"cpa:"+r0)};}).filter(x=>x.n>0&&!split).sort((x,y)=>y.n-x.n).slice(0,8);
+  let splitCard="";
+  if(split){ const sm=["cost","installs","cpa:installs",...S.events.filter(e=>(a.s[e]||0)>0).slice(0,2).flatMap(e=>[e,"cpa:"+e])].filter(m=>split.some(g=>spVal(g.a,m)!=null));
+    splitCard=`<div class="sp-split">${split.map(g=>`<div><h3>${esc(g.name)}</h3>${sm.map(m=>{ const v=spVal(g.a,m), tot=spVal(a,m), sh=!isRatio2(m)&&tot?v/tot:null;
+        return `<div class="row"><span>${esc(spLabel(m))}</span><b>${spNum(m,v)}${spUnit(m,cur)}</b>${sh!=null?`<i style="--w:${Math.round(sh*100)}%"></i>`:""}</div>`; }).join("")}</div>`).join("")}</div>`; }
   if(camps.length>1) SP.draw.spOvCamp=()=>spChart("spOvCamp",{type:"bar",data:{labels:camps.map(x=>x.name),datasets:[{label:spLabel(r0),data:camps.map(x=>x.n),backgroundColor:camps.map((_,i)=>alpha(ac,Math.max(.3,.9-i*.08))),borderRadius:8,barThickness:"flex",maxBarThickness:26}]},
     options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{...tooltipBase(),callbacks:{label:x=>{ const k=camps[x.dataIndex]; return [` ${spLabel(r0)}: ${spFmt(r0,k.n)}`,...(k.c?[` هزینه هر مورد: ${fa(k.c)}`]:[])]; }}}},
       scales:{x:spScale(v=>spFmt(r0,v)),y:{grid:{display:false},border:{display:false},ticks:{autoSkip:false,font:{size:11.5}}}}}});
   const body=REPORT&&REPORT.narr?cleanHtml(REPORT.narr):(()=>{ const sv=savedReport(); return sv?cleanHtml(sv.html):draftReport(info,recs,prevRecs,hasPrev,from,to); })();
   return `<div class="sp-stats">${tiles}</div>`
     +spCard(`<h2>روند روزانه</h2><p class="sub">هزینه هر روز${cpas.length?" و "+cpas.map(spLabel).join(" و "):""}</p><div class="sp-chart lg"><canvas id="spOvDaily"></canvas></div>`,"","spOvDaily")
+    +(split?spCard(`<h2>${split.map(g=>esc(g.name)).join(" و ")}</h2><p class="sub">نوار زیر هر عدد سهم آن از کل است</p>${splitCard}`,"","",.05):"")
     +`<div class="sp-grid">`+(camps.length>1?spCard(`<h2>کمپین‌های برتر</h2><p class="sub">${esc(spLabel(r0))} به تفکیک کمپین</p><div class="sp-chart" style="height:${Math.max(200,camps.length*38+40)}px"><canvas id="spOvCamp"></canvas></div>`,"","spOvCamp",.05):"")
     +spCard(`<div class="sp-text">${body}</div>`,"","",.1)+`</div>`;
 }
