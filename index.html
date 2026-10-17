@@ -218,7 +218,7 @@ body.page-report .rep-doc,body.client .rep-doc{max-width:none}
 body.client .wrap{max-width:1100px}
 body.client #reportView{order:-1}
 body.client .client-h{margin:8px 0 -4px;font-size:18px;font-weight:800}
-/* special report: an exported file only (Arya 2026-10-17). Two tabs (overview, industry), with animated tab changes and on scroll */
+/* special report: an exported file only (Arya 2026-10-17). Two tabs (overview, industry average), with animated tab changes and on scroll */
 body.special .wrap>*:not(#specialView){display:none!important}
 body.special .wrap{max-width:1120px;padding-block:0 56px}
 body.special{background:radial-gradient(1200px 600px at 100% -10%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 60%),var(--bg);background-attachment:fixed}
@@ -277,6 +277,7 @@ html:has(body.special){scroll-behavior:smooth}
 .sp-ctl{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between}
 .sp-score{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
 .sp-rank{font-size:12px;color:var(--muted)}
+.sp-h{margin:6px 4px -4px;font-size:16px;font-weight:800}
 .sp-foot{text-align:center;font-size:12px;color:var(--muted)}
 /* scroll reveal: cards rise in as they enter the screen */
 .rv{opacity:0;transform:translateY(26px) scale(.985);transition:opacity .7s var(--ease),transform .7s var(--ease);transition-delay:var(--d,0s)}
@@ -598,7 +599,7 @@ try{ window.matchMedia("print").addEventListener("change",e=>printCharts(e.match
 
 function loadSnapshot(src){
   return { clients: src.clients, rows: src.rows.map(r=>({date:r[0],client:r[1],source:r[2],campaign_id:r[3],campaign:r[4],metric:r[5],value:+r[6]||0,pub:r[7]||""})),
-           pubs: pubsFrom(src.pubs), industry: industryFrom(src.industry), loadedAt: src.generated, live:false };
+           pubs: pubsFrom(src.pubs), loadedAt: src.generated, live:false };
 }
 let statusNote="";
 function setStatus(){
@@ -619,7 +620,7 @@ function fromTable(dataRows, clientRows, at, reportRows, pubRows){
            loadedAt: at||new Date().toISOString(), live:true };
 }
 /* inside claude.ai: read the sheet through the viewer's Google Sheets connector and keep it current */
-let MCP=null, live={data:null,clients:null,reports:null,industry:null,at:null};
+let MCP=null, live={data:null,clients:null,reports:null,at:null};
 const ERR_COPY={
   needs_reauth:"اتصال Google Sheets منقضی شده؛ در تنظیمات claude.ai دوباره وصل کنید",
   server_not_connected:"Google Sheets وصل نیست؛ از تنظیمات claude.ai بخش Connectors وصلش کنید",
@@ -633,7 +634,7 @@ function onSheet(part){
     if(ev.type==="data"){
       const v=ev.result.payload&&ev.result.payload.values; if(!Array.isArray(v)) return;
       live[part]=v; live.at=ev.result.cache?new Date(ev.result.cache.storedAt).toISOString():new Date().toISOString();
-      if(live.data){ DB=fromTable(live.data,live.clients,live.at,live.reports,live.publishers); DB.industry=industryFrom(live.industry); statusNote=""; setStatus(); render(); }
+      if(live.data){ DB=fromTable(live.data,live.clients,live.at,live.reports,live.publishers); statusNote=""; setStatus(); render(); }
     } else {
       const code=ev.error&&ev.error.code;
       const deny=["needs_reauth","server_not_connected","blocked_by_policy","approval_required","not_in_manifest","selection_required"].includes(code);
@@ -649,11 +650,9 @@ async function startConnector(){
   if(!MCP) return false;
   const opts={refetchInterval:300000};
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"data!A1:I"},onSheet("data"),opts);
-  MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"clients!A1:J"},onSheet("clients"),opts);
+  MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"clients!A1:L"},onSheet("clients"),opts);
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"reports!A1:E"},onSheet("reports"),opts);
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"publishers!A1:Z"},onSheet("publishers"),opts);
-  /* industry benchmarks for the special report; the tab is optional, so a missing tab is not an error */
-  MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"industry!A1:H"},ev=>{ const v=ev.type==="data"&&ev.result.payload&&ev.result.payload.values; if(!Array.isArray(v)) return; live.industry=v; if(DB&&DB.live) DB.industry=industryFrom(v); },opts);
   return true;
 }
 /* outside claude.ai: the published CSV of the sheet (needs link sharing on) */
@@ -664,7 +663,7 @@ async function fetchSheet(tab){
   const text=await res.text(); if(/^\s*</.test(text)) throw new Error("not shared");
   return parseCSV(text);
 }
-async function loadCSV(){ const [d,c,r,p,n]=await Promise.all([fetchSheet("data"),fetchSheet("clients"),fetchSheet("reports").catch(()=>null),fetchSheet("publishers").catch(()=>null),fetchSheet("industry").catch(()=>null)]); const db=fromTable(d,c,null,r,p); db.industry=industryFrom(n); return db; }
+async function loadCSV(){ const [d,c,r,p]=await Promise.all([fetchSheet("data"),fetchSheet("clients"),fetchSheet("reports").catch(()=>null),fetchSheet("publishers").catch(()=>null)]); return fromTable(d,c,null,r,p); }
 /* inside a Google Apps Script web app the page talks to the sheet through google.script.run */
 const GAS = !!(window.google&&google.script&&google.script.run);
 const gas = (fn,...a) => new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej({message:String(e&&e.message||e)}))[fn](...a));
@@ -1561,30 +1560,27 @@ async function saveImport(){
 }
 
 /* ---------- special report: an exported file with two tabs, overview and industry comparison (Arya 2026-10-17; the forecast tab was dropped the same day). The file never calls itself special ---------- */
-/* industry tab of the sheet: client, company, metric, value, period, source. client is our client id (or * for all);
-   the company named industry / صنعت / میانگین is the industry average, any other company is a competitor */
-function industryFrom(rows){ if(!rows||!rows.length) return []; const h=rows[0].map(x=>String(x).trim().toLowerCase());
-  if(!h.includes("company")||!h.includes("metric")||!h.includes("value")) return [];
-  return tableToObjects([h,...rows.slice(1)]).filter(r=>r.company&&r.metric&&r.value!==""); }
-const IND_HEAD=["client","company","metric","value","period","source"];
-const IND_AVG=/^(industry|industry average|average|avg|صنعت|میانگین|میانگین صنعت|میانگین بازار|بازار)$/i;
-function indMetric(m){ const k=String(m||"").trim(), l=k.toLowerCase();
-  if(l==="cpi"||l==="cpa:installs") return "cpa:installs";
-  if(["ctr","cpc","cpm","cost","installs","clicks","impressions"].includes(l)) return l;
-  if(/^(cpa|cr):/.test(l)) return l.slice(0,l.indexOf(":")+1)+k.slice(k.indexOf(":")+1).trim();
-  return k; }
-function indNum(m,v){ const t=String(v), n=+t.replace(/[,٬%٪\s]/g,"").replace(/[۰-۹]/g,d=>FA_D.indexOf(d)).replace("٫","."); if(!isFinite(n)) return null;
-  return (m==="ctr"||m.startsWith("cr:"))&&(n>1||/[%٪]/.test(t))?n/100:n; }
-function industryRows(info){ const me=String(S.client).toLowerCase(), grp=String(info.industry||"").trim().toLowerCase();
-  return (DB.industry||[]).filter(r=>{ const k=String(r.client||"").trim().toLowerCase(); return k==="*"||k==="all"||k===me||(grp&&k===grp); }); }
+/* industry averages live in the clients tab, column "industry", one entry per metric: "ctr=6.18%; rate:installs/clicks=2.29%; ..."
+   rate:A/B is A per B over the rows that have B (A or B can add events with +, e.g. Buy+Sell). Only the industry average is kept,
+   never other companies' names or numbers (Arya 2026-10-17) */
+function indNum(v){ const t=String(v), n=+t.replace(/[,٬%٪\s]/g,"").replace(/[۰-۹]/g,d=>FA_D.indexOf(d)).replace("٫","."); if(!isFinite(n)) return null;
+  return /[%٪]/.test(t)?n/100:n; }
+function industryRows(info){ const out=[]; String(info.industry||"").split(/[;\n]/).forEach(p=>{ const i=p.lastIndexOf("="); if(i<0) return;
+  const m=p.slice(0,i).trim(), v=indNum(p.slice(i+1)); if(m&&v!=null) out.push({m:m.toLowerCase()==="cpi"?"cpa:installs":m,v}); }); return out; }
+const rateParts=m=>{ const [n,d]=m.slice(5).split("/"); return [n.split("+").map(s=>s.trim()),(d||"").split("+").map(s=>s.trim())]; };
+function spRate(recs,m){ const [N,D]=rateParts(m); let a=0,b=0;
+  for(const o of recs){ const d=D.reduce((s,k)=>s+(o.m[k]||0),0); if(d>0){ b+=d; a+=N.reduce((s,k)=>s+(o.m[k]||0),0); } } return b?a/b:null; }
+const STEP_NAME={impressions:"نمایش",clicks:"کلیک",installs:"نصب",Register:"ثبت‌نام",KYC:"احراز هویت","Buy+Sell":"معامله"};
+const stepName=k=>STEP_NAME[k]||evName(k);
 
 const SPECIAL=!!(REPORT&&REPORT.mode==="special");
 const SP={tab:"ov",charts:{},draw:{},obs:null};
 const SP_TABS=["ov","ind"], SP_PANEL={ov:"spOv",ind:"spIndP"};
 const reduceMotion=()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){ return false; } };
 const lowerBetter=m=>isCostLike(m)||m==="cpm";
-function spLabel(m){ return m==="cost"?"هزینه":m==="cpa:installs"?"هزینه هر نصب (CPI)":m.startsWith("cpa:")?"هزینه هر "+evName(m.slice(4)):m==="ctr"?"نرخ کلیک (CTR)":m==="cpc"?"هزینه هر کلیک (CPC)":m==="cpm"?"هزینه هر هزار نمایش (CPM)":m.startsWith("cr:")?"نرخ "+evName(m.slice(3)):m==="installs"?"نصب":m==="clicks"?"کلیک":m==="impressions"?"نمایش":evName(m); }
-const spKind=m=>m==="ctr"||m.startsWith("cr:")?"p":m==="cost"?"c":"n";
+function spLabel(m){ if(m.startsWith("rate:")){ const [n,d]=rateParts(m).map(x=>x.join("+")); return `${stepName(n)} به ازای ${stepName(d)}`; }
+  return m==="cost"?"هزینه":m==="cpa:installs"?"هزینه هر نصب (CPI)":m.startsWith("cpa:")?"هزینه هر "+evName(m.slice(4)):m==="ctr"?"نرخ کلیک (CTR)":m==="cpc"?"هزینه هر کلیک (CPC)":m==="cpm"?"هزینه هر هزار نمایش (CPM)":m.startsWith("cr:")?"نرخ "+evName(m.slice(3)):m==="installs"?"نصب":m==="clicks"?"کلیک":m==="impressions"?"نمایش":evName(m); }
+const spKind=m=>m==="ctr"||m.startsWith("cr:")||m.startsWith("rate:")?"p":m==="cost"?"c":"n";
 const SPF={n:v=>fa(Math.round(v)),c:v=>compact(v),p:v=>faPct(v)};
 const spFmt=(m,v)=>v==null||!isFinite(v)?"–":SPF[spKind(m)](v);
 function spVal(a,m){ if(m==="cpm"){ const i=a.s.impressions||0; return i?(a.s.cost||0)/i*1000:null; } return value(a,m); }
@@ -1689,38 +1685,48 @@ function spOverview(c){
     +spCard(`<div class="sp-text">${body}</div>`,"","",.1)+`</div>`;
 }
 
-/* tab 2: our numbers next to the industry average and competitors, from the sheet's industry tab */
+/* tab 2: every ratio next to the industry average, from the clients tab's industry column */
 function spIndustry(c){
-  const {info,recs}=c, a=aggregate(recs), cur=esc(info.currency||""), me=info.display_name||S.client;
-  const by=new Map(); industryRows(info).forEach(r=>{ const m=indMetric(r.metric), v=indNum(m,r.value); if(v==null) return;
-    const o=by.get(m)||by.set(m,{m,comps:[],avg:null,period:new Set(),source:new Set()}).get(m);
-    if(IND_AVG.test(String(r.company).trim())) o.avg=v; else o.comps.push({name:r.company,v});
-    if(r.period) o.period.add(r.period); if(r.source) o.source.add(r.source); });
-  const ms=[...by.values()].map(o=>{ const ours=spVal(a,o.m); if(ours==null) return null;
-    const avg=o.avg!=null?o.avg:o.comps.length?o.comps.reduce((s,x)=>s+x.v,0)/o.comps.length:null; if(avg==null||!avg) return null;
-    const lb=lowerBetter(o.m), gap=lb?avg/ours-1:ours/avg-1;   /* gap > 0: better than the industry */
-    const all=[{name:me,v:ours,me:true},...o.comps].sort((x,y)=>lb?x.v-y.v:y.v-x.v);
-    return {...o,ours,avg,gap,lb,all,rank:all.findIndex(x=>x.me)+1}; }).filter(Boolean);
+  const {info,recs}=c, a=aggregate(recs), me=info.display_name||S.client;
+  const ms=industryRows(info).map(({m,v})=>{ const ours=m.startsWith("rate:")?spRate(recs,m):spVal(a,m); if(ours==null||!v) return null;
+    const lb=lowerBetter(m); return {m,avg:v,ours,lb,gap:lb?v/ours-1:ours/v-1}; }).filter(Boolean);   /* gap > 0: better than the industry */
   if(!ms.length) return "";
   const ac=accentColor(), gray=cssVar("--other"), ink=cssVar("--ink-2");
-  const tiles=ms.map((o,i)=>{ const pill=o.gap>=0.03?spPill("good",`${pctTxt(o.gap)} بهتر از میانگین صنعت`):o.gap>-0.03?spPill("","هم‌سطح میانگین صنعت"):spPill("warn",`${pctTxt(o.gap)} تا میانگین صنعت`);
-    return `<div class="sp-stat rv" style="--d:${(i*0.06).toFixed(2)}s"><div class="k">${esc(spLabel(o.m))}</div><div class="v">${spNum(o.m,o.ours)}${spUnit(o.m,cur)}</div><div class="sp-rank">میانگین صنعت ${spFmt(o.m,o.avg)}${o.all.length>1?` · رتبه ${fa(o.rank)} از ${fa(o.all.length)}`:""}</div>${pill}</div>`; }).join("");
-  let html=`<div class="sp-score">${tiles}</div>`;
+  const tile=(o,i)=>{ const pill=o.gap>=0.03?spPill("good",`${pctTxt(o.gap)} بهتر از میانگین صنعت`):o.gap>-0.03?spPill("","هم‌سطح میانگین صنعت"):spPill("warn",`${pctTxt(o.gap)} تا میانگین صنعت`);
+    return `<div class="sp-stat rv" style="--d:${(i*0.05).toFixed(2)}s"><div class="k">${esc(spLabel(o.m))}</div><div class="v">${spNum(o.m,o.ours)}${spUnit(o.m,esc(info.currency||""))}</div><div class="sp-rank">میانگین صنعت ${spFmt(o.m,o.avg)}</div>${pill}</div>`; };
+  /* funnel steps: rates whose base is the step before (clicks per impression, installs per click, ...) */
+  const ORDER=["impressions","clicks","installs","Register","KYC","Buy+Sell"], key=m=>m==="ctr"?["clicks","impressions"]:m.startsWith("rate:")?rateParts(m).map(x=>x.join("+")):null;
+  const steps=ms.filter(o=>{ const k=key(o.m); return k&&ORDER.indexOf(k[0])===ORDER.indexOf(k[1])+1; }).sort((x,y)=>ORDER.indexOf(key(x.m)[1])-ORDER.indexOf(key(y.m)[1]));
+  const overall=ms.filter(o=>!steps.includes(o));
+  let html=`<div class="sp-card rv"><h2>${esc(me)} در برابر میانگین صنعت</h2><p class="sub" style="margin:0">هر نرخ با میانگین وزنی همان نرخ در صنعت مقایسه شده است</p></div>`;
+  if(steps.length) html+=`<h2 class="sp-h rv">مرحله به مرحله قیف</h2><div class="sp-score">${steps.map(tile).join("")}</div>`;
+  if(overall.length) html+=`<h2 class="sp-h rv">نرخ‌های کلی</h2><div class="sp-score">${overall.map(tile).join("")}</div>`;
+  /* the funnel per million impressions: chaining the step rates shows where each side keeps more people */
+  const chain=[]; if(steps.length>=2&&key(steps[0].m)[1]==="impressions"){ let u=1e6, v=1e6; chain.push({k:"impressions",u,v});
+    for(const o of steps){ const k=key(o.m); if(k[1]!==chain[chain.length-1].k) break; u*=o.ours; v*=o.avg; chain.push({k:k[0],u,v}); } }
+  if(chain.length>=3){
+    SP.draw.spFunnel=()=>spChart("spFunnel",{type:"bar",data:{labels:chain.map(x=>stepName(x.k)),datasets:[
+        {label:me,data:chain.map(x=>x.u),backgroundColor:spGrad(ac,.55,1),borderRadius:8,maxBarThickness:46},
+        {label:"میانگین صنعت",data:chain.map(x=>x.v),backgroundColor:alpha(gray,.55),borderRadius:8,maxBarThickness:46}]},
+      options:{plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:x=>` ${x.dataset.label}: ${fa(Math.round(x.parsed.y))}`}}},
+        scales:{x:{grid:{display:false}},y:{type:"logarithmic",grid:{color:cssVar("--line")},border:{display:false},ticks:{callback:v=>[1,10,100,1e3,1e4,1e5,1e6].includes(v)?compact(v):"",maxTicksLimit:8}}}}});
+    html+=spCard(`<h2>از هر یک میلیون نمایش</h2><p class="sub">چند نفر به هر مرحله می‌رسند، با نرخ‌های ${esc(me)} و نرخ‌های میانگین صنعت (محور لگاریتمی)</p><div class="sp-chart lg"><canvas id="spFunnel"></canvas></div>`,"","spFunnel"); }
+  /* every ratio side by side */
+  const all=[...steps,...overall];
+  SP.draw.spIndBars=()=>spChart("spIndBars",{type:"bar",data:{labels:all.map(o=>spLabel(o.m)),datasets:[
+      {label:me,data:all.map(o=>o.ours),backgroundColor:ac,borderRadius:6,maxBarThickness:18},
+      {label:"میانگین صنعت",data:all.map(o=>o.avg),backgroundColor:alpha(gray,.6),borderRadius:6,maxBarThickness:18}]},
+    options:{indexAxis:"y",plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:x=>` ${x.dataset.label}: ${spFmt(all[x.dataIndex].m,x.parsed.x)}`}}},
+      scales:{x:{type:"logarithmic",grid:{color:cssVar("--line")},border:{display:false},ticks:{callback:v=>[0.001,0.01,0.1,1,10].includes(+v.toPrecision(1))?faPct(v):"",maxTicksLimit:6}},y:{grid:{display:false},border:{display:false},ticks:{autoSkip:false,font:{size:12}}}}}});
+  html+=spCard(`<h2>همه نرخ‌ها کنار هم</h2><p class="sub">محور لگاریتمی، تا نرخ‌های کوچک و بزرگ هر دو دیده شوند</p><div class="sp-chart" style="height:${Math.max(220,all.length*52+60)}px"><canvas id="spIndBars"></canvas></div>`,"","spIndBars",.05);
   /* index: the industry is 100, above 100 is better than the industry on that metric */
-  if(ms.length>=3){ const idx=ms.map(o=>Math.min(250,Math.round(100*(1+o.gap))));
-    SP.draw.spIndRadar=()=>spChart("spIndRadar",{type:"radar",data:{labels:ms.map(o=>spLabel(o.m)),datasets:[
+  if(ms.length>=3){ const idx=all.map(o=>Math.min(250,Math.round(100*(1+o.gap))));
+    SP.draw.spIndRadar=()=>spChart("spIndRadar",{type:"radar",data:{labels:all.map(o=>spLabel(o.m)),datasets:[
         {label:me,data:idx,borderColor:ac,backgroundColor:alpha(ac,.22),borderWidth:2.5,pointBackgroundColor:ac,pointRadius:4},
-        {label:"میانگین صنعت",data:ms.map(()=>100),borderColor:gray,borderDash:[5,4],backgroundColor:"transparent",borderWidth:1.5,pointRadius:0}]},
+        {label:"میانگین صنعت",data:all.map(()=>100),borderColor:gray,borderDash:[5,4],backgroundColor:"transparent",borderWidth:1.5,pointRadius:0}]},
       options:{plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:x=>` ${x.dataset.label}: ${fa(x.parsed.r)}`}}},
-        scales:{r:{suggestedMin:0,suggestedMax:Math.max(150,...idx),grid:{color:cssVar("--line")},angleLines:{color:cssVar("--line")},ticks:{display:false},pointLabels:{color:ink,font:{size:12}}}}}});
-    html+=spCard(`<h2>جایگاه در برابر صنعت</h2><p class="sub">میانگین صنعت = ۱۰۰؛ بیشتر از ۱۰۰ یعنی بهتر از صنعت در آن شاخص</p><div class="sp-chart lg"><canvas id="spIndRadar"></canvas></div>`,"","spIndRadar"); }
-  html+=`<div class="sp-grid">`+ms.map((o,i)=>{ const id="spInd"+i, list=[...o.all,{name:"میانگین صنعت",v:o.avg,avg:true}].sort((x,y)=>o.lb?x.v-y.v:y.v-x.v);
-    SP.draw[id]=()=>spChart(id,{type:"bar",data:{labels:list.map(x=>x.name),datasets:[{label:spLabel(o.m),data:list.map(x=>x.v),
-        backgroundColor:list.map(x=>x.me?ac:x.avg?alpha(ink,.35):alpha(gray,.45)),borderRadius:8,maxBarThickness:28}]},
-      options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{...tooltipBase(),callbacks:{label:x=>` ${spFmt(o.m,x.parsed.x)}`}}},
-        scales:{x:spScale(v=>spFmt(o.m,v)),y:{grid:{display:false},border:{display:false},ticks:{autoSkip:false,font:x=>({size:12,weight:list[x.index]&&list[x.index].me?"700":"400"})}}}}});
-    const note=[...o.period].concat([...o.source]).join(" · ");
-    return spCard(`<h2>${esc(spLabel(o.m))}</h2><p class="sub">${o.lb?"کمتر بهتر است":"بیشتر بهتر است"}${note?" · "+esc(note):""}</p><div class="sp-chart" style="height:${Math.max(170,list.length*40+30)}px"><canvas id="${id}"></canvas></div>`,"",id,(i%2)*.06); }).join("")+`</div>`;
+        scales:{r:{suggestedMin:0,suggestedMax:Math.max(150,...idx),grid:{color:cssVar("--line")},angleLines:{color:cssVar("--line")},ticks:{display:false},pointLabels:{color:ink,font:{size:11.5}}}}}});
+    html+=spCard(`<h2>شاخص عملکرد</h2><p class="sub">میانگین صنعت = ۱۰۰؛ بیشتر از ۱۰۰ یعنی بهتر از صنعت</p><div class="sp-chart lg"><canvas id="spIndRadar"></canvas></div>`,"","spIndRadar"); }
   return html;
 }
 
@@ -1737,7 +1743,7 @@ async function exportReport(mode){
   /* the client copy also carries the period before, so its charts and tiles can compare */
   const lo=lite?addDays(S.from,-(dayDiff(S.from,S.to)+1)):S.from;
   const rows=DB.rows.filter(r=>r.client===S.client&&r.date>=lo&&r.date<=S.to);
-  const snap={generated:new Date().toISOString(),clients:[info],rows:rows.map(r=>[r.date,r.client,r.source,r.campaign_id,r.campaign,r.metric,r.value,r.pub||""]),pubs:lite?null:pubsSnap(),industry:special?[IND_HEAD,...industryRows(info).map(r=>IND_HEAD.map(k=>r[k]||""))]:null};
+  const snap={generated:new Date().toISOString(),clients:[info],rows:rows.map(r=>[r.date,r.client,r.source,r.campaign_id,r.campaign,r.metric,r.value,r.pub||""]),pubs:lite?null:pubsSnap()};
   const body=document.getElementById("repBody");
   const sv=savedReport(), narr=REP.key===repKey()&&body.innerHTML.trim()?cleanHtml(body.innerHTML):(sv?cleanHtml(sv.html):null);
   /* preset -1 keeps the exact range; with 0 the copy opened on all its rows, the earlier period included */
