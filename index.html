@@ -218,7 +218,7 @@ body.page-report .rep-doc,body.client .rep-doc{max-width:none}
 body.client .wrap{max-width:1100px}
 body.client #reportView{order:-1}
 body.client .client-h{margin:8px 0 -4px;font-size:18px;font-weight:800}
-/* special report: an exported file only (Arya 2026-10-17). Three tabs (overview, industry, forecast), with animated tab changes and on scroll */
+/* special report: an exported file only (Arya 2026-10-17). Two tabs (overview, industry), with animated tab changes and on scroll */
 body.special .wrap>*:not(#specialView){display:none!important}
 body.special .wrap{max-width:1120px;padding-block:0 56px}
 body.special{background:radial-gradient(1200px 600px at 100% -10%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 60%),var(--bg);background-attachment:fixed}
@@ -231,8 +231,8 @@ html:has(body.special){scroll-behavior:smooth}
 .sp-hero::before{width:340px;height:340px;inset-inline-end:-80px;top:-120px;background:color-mix(in srgb,var(--brand,#1c5cab) 60%,#fff)}
 .sp-hero::after{width:260px;height:260px;inset-inline-start:10%;bottom:-150px;background:color-mix(in srgb,var(--brand,#1c5cab) 40%,#7a3fb8);animation-duration:18s}
 @keyframes spFloat{to{transform:translate(-40px,30px) scale(1.12)}}
+.sp.one .sp-hero{padding-bottom:clamp(28px,5vw,48px)}
 .sp-hero-in{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:18px 28px;align-items:center;justify-content:space-between}
-.sp-eyebrow{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.02em;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);padding:3px 12px;border-radius:999px;margin-bottom:10px}
 .sp-hero h1{margin:0;font-size:clamp(22px,4vw,34px);font-weight:800;line-height:1.3;text-wrap:balance}
 .sp-hero .range{display:block;margin-top:6px;font-size:14px;opacity:.85}
 .sp-hero .logo-badge{box-shadow:0 10px 30px rgba(0,0,0,.25);border:0}
@@ -275,20 +275,6 @@ html:has(body.special){scroll-behavior:smooth}
 .sp-empty{text-align:center;padding:48px 20px;color:var(--ink-2)}
 .sp-empty svg{width:46px;height:46px;color:var(--accent);opacity:.7}
 .sp-ctl{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between}
-.sp-seg{display:inline-flex;gap:4px;padding:4px;background:var(--wash);border-radius:999px}
-.sp-seg button{border:0;background:none;padding:6px 14px;border-radius:999px;cursor:pointer;font-weight:700;color:var(--ink-2);transition:background .25s,color .25s}
-.sp-seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.08)}
-.sp-range{display:flex;align-items:center;gap:12px;flex:1 1 240px;max-width:420px}
-.sp-range input{flex:1;accent-color:var(--accent)}
-.sp-range b{min-width:4.5em;text-align:center;font-size:15px}
-.sp-fc{display:grid;gap:4px}
-.sp-fc .row{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
-.sp-fc .big{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
-.sp-fc .lbl{font-size:12.5px;color:var(--muted)}
-.sp-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink-2)}
-.sp-legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-inline-end:6px;background:var(--accent)}
-.sp-legend i.dash{background:repeating-linear-gradient(to left,var(--accent) 0 5px,transparent 5px 8px)}
-.sp-legend i.band{height:10px;opacity:.25}
 .sp-score{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
 .sp-rank{font-size:12px;color:var(--muted)}
 .sp-foot{text-align:center;font-size:12px;color:var(--muted)}
@@ -317,7 +303,7 @@ html:has(body.special){scroll-behavior:smooth}
       <span class="status" id="status"><i></i><span id="statusText">در حال بارگذاری…</span></span>
       <button class="btn no-report" id="refreshBtn" type="button">به‌روزرسانی داده</button>
       <button class="btn no-report" id="importBtn" type="button">وارد کردن خروجی ادتریس</button>
-      <button class="btn no-report" id="specialBtn" type="button" title="فایل HTML گزارش ویژه: نمای کلی، مقایسه با صنعت و پیش‌بینی">خروجی گزارش ویژه</button>
+      <button class="btn no-report" id="specialBtn" type="button" title="فایل HTML گزارش: نمای کلی و مقایسه با صنعت">خروجی گزارش ویژه</button>
       <button class="btn primary no-report" id="exportBtn" type="button">خروجی گزارش مشتری</button>
     </div>
   </header>
@@ -472,11 +458,11 @@ html:has(body.special){scroll-behavior:smooth}
 
   <article class="rep-doc client-only" id="repTextCard" aria-label="متن گزارش"></article>
 
-  <section class="sp" id="specialView" hidden aria-label="گزارش ویژه">
+  <section class="sp" id="specialView" hidden aria-label="گزارش">
     <div class="sp-prog" aria-hidden="true"><i id="spProg"></i></div>
     <header class="sp-hero">
       <div class="sp-hero-in">
-        <div><span class="sp-eyebrow">گزارش ویژه</span><h1 id="spTitle"></h1><span class="range" id="spRange"></span></div>
+        <div><h1 id="spTitle"></h1><span class="range" id="spRange"></span></div>
         <span class="logo-badge" id="spLogo" hidden><img alt=""></span>
       </div>
     </header>
@@ -484,11 +470,9 @@ html:has(body.special){scroll-behavior:smooth}
       <span class="sp-ind" id="spInd" aria-hidden="true"></span>
       <button type="button" role="tab" data-t="ov" aria-controls="spOv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>نمای کلی</button>
       <button type="button" role="tab" data-t="ind" aria-controls="spIndP"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>مقایسه با صنعت</button>
-      <button type="button" role="tab" data-t="fc" aria-controls="spFc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>پیش‌بینی آینده</button>
     </nav>
     <section class="sp-panel" id="spOv" role="tabpanel" aria-label="نمای کلی"></section>
     <section class="sp-panel" id="spIndP" role="tabpanel" aria-label="مقایسه با صنعت" hidden></section>
-    <section class="sp-panel" id="spFc" role="tabpanel" aria-label="پیش‌بینی آینده" hidden></section>
     <footer class="sp-foot" id="spFoot"></footer>
   </section>
 </div>
@@ -985,10 +969,7 @@ function render(){
   document.getElementById("chartMetric").innerHTML=(S.view==="scatter"?MC:M).map(m=>opt(m,label(m),m===cm)).join("");
 
   const recs=pivot(cur,idx), prevRecs=pivot(prev,idx);
-  /* the special report's forecast reads the trend of the period, or of the last 14 days when the period is shorter */
-  if(SPECIAL){ let hFrom=span>=14?from:addDays(to,-13); if(hFrom<minD) hFrom=minD;
-    const hist=hFrom<from?pivot(rowsAll.filter(r=>r.date>=hFrom&&r.date<=to&&keep(r)),idx):recs;
-    renderSpecial({info,recs,prevRecs,hasPrev:prev.length>0,from,to,M,brand,hist,hFrom}); return; }
+  if(SPECIAL){ renderSpecial({info,recs,prevRecs,hasPrev:prev.length>0,from,to,M,brand}); return; }
   renderSummary(info,recs,idx,rowsAll);
   document.body.classList.toggle("page-report",S.page==="report");
   document.getElementById("reportView").hidden=S.page!=="report"&&!CLIENT;
@@ -1579,7 +1560,7 @@ async function saveImport(){
   }
 }
 
-/* ---------- special report: an exported file with three tabs, overview, industry comparison and forecast (Arya 2026-10-17) ---------- */
+/* ---------- special report: an exported file with two tabs, overview and industry comparison (Arya 2026-10-17; the forecast tab was dropped the same day). The file never calls itself special ---------- */
 /* industry tab of the sheet: client, company, metric, value, period, source. client is our client id (or * for all);
    the company named industry / صنعت / میانگین is the industry average, any other company is a competitor */
 function industryFrom(rows){ if(!rows||!rows.length) return []; const h=rows[0].map(x=>String(x).trim().toLowerCase());
@@ -1598,11 +1579,10 @@ function industryRows(info){ const me=String(S.client).toLowerCase(), grp=String
   return (DB.industry||[]).filter(r=>{ const k=String(r.client||"").trim().toLowerCase(); return k==="*"||k==="all"||k===me||(grp&&k===grp); }); }
 
 const SPECIAL=!!(REPORT&&REPORT.mode==="special");
-const SP={tab:"ov",h:7,charts:{},draw:{},obs:null,cards:[]};
-const SP_TABS=["ov","ind","fc"], SP_PANEL={ov:"spOv",ind:"spIndP",fc:"spFc"};
+const SP={tab:"ov",charts:{},draw:{},obs:null};
+const SP_TABS=["ov","ind"], SP_PANEL={ov:"spOv",ind:"spIndP"};
 const reduceMotion=()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){ return false; } };
 const lowerBetter=m=>isCostLike(m)||m==="cpm";
-const isRatio=m=>m==="ctr"||m==="cpc"||m==="cpm"||m.startsWith("cpa:")||m.startsWith("cr:");
 function spLabel(m){ return m==="cost"?"هزینه":m==="cpa:installs"?"هزینه هر نصب (CPI)":m.startsWith("cpa:")?"هزینه هر "+evName(m.slice(4)):m==="ctr"?"نرخ کلیک (CTR)":m==="cpc"?"هزینه هر کلیک (CPC)":m==="cpm"?"هزینه هر هزار نمایش (CPM)":m.startsWith("cr:")?"نرخ "+evName(m.slice(3)):m==="installs"?"نصب":m==="clicks"?"کلیک":m==="impressions"?"نمایش":evName(m); }
 const spKind=m=>m==="ctr"||m.startsWith("cr:")?"p":m==="cost"?"c":"n";
 const SPF={n:v=>fa(Math.round(v)),c:v=>compact(v),p:v=>faPct(v)};
@@ -1662,16 +1642,14 @@ function renderSpecial(c){
   document.getElementById("spTitle").textContent="گزارش عملکرد تبلیغات "+name;
   document.getElementById("spRange").textContent=jLong(from)+" تا "+jLong(to)+" · "+fa(dayDiff(from,to)+1)+" روز";
   const lg=document.getElementById("spLogo"); lg.hidden=!brand.src; if(brand.src){ const im=lg.querySelector("img"); im.src=brand.src; im.alt=name; }
-  document.title="گزارش ویژه "+name;
+  document.title="گزارش عملکرد تبلیغات "+name;
   Object.values(SP.charts).forEach(ch=>{ try{ ch.destroy(); }catch(e){} }); SP.charts={}; SP.draw={};
   if(SP.obs){ SP.obs.disconnect(); SP.obs=null; }
   if(window.Chart) chartBase();
   document.getElementById("spOv").innerHTML=spOverview(c);
   const ind=spIndustry(c); document.getElementById("spIndP").innerHTML=ind;
-  const hasInd=!!ind; document.querySelector('#spTabs [data-t="ind"]').hidden=!hasInd; if(!hasInd&&SP.tab==="ind") SP.tab="ov";
-  document.getElementById("spFc").innerHTML=spForecast(c);
-  spForecastWire();
-  document.getElementById("spFoot").textContent=`گزارش ویژه ${name} · ساخته‌شده در ${jLong(REPORT?REPORT.made:new Date().toISOString().slice(0,10))}`;
+  const hasInd=!!ind; document.getElementById("spTabs").hidden=!hasInd; document.getElementById("specialView").classList.toggle("one",!hasInd); if(!hasInd) SP.tab="ov";   /* no industry rows: the overview alone, without tabs */
+  document.getElementById("spFoot").textContent=`گزارش عملکرد تبلیغات ${name} · ساخته‌شده در ${jLong(REPORT?REPORT.made:new Date().toISOString().slice(0,10))}`;
   spShow(SP.tab,false);
 }
 
@@ -1746,83 +1724,6 @@ function spIndustry(c){
   return html;
 }
 
-/* tab 3: each metric's daily trend carried forward. Volumes follow a straight-line trend, cost per result and rates a
-   constant daily % change (they stay positive); the shaded band is where 80% of outcomes would fall if days stay as noisy.
-   The trend eases off ahead (each day keeps 93% of the day before's change), so a short burst is not stretched over 30 days */
-const SP_MIN_DAYS=7, SP_DAMP=0.93;
-function spFit(pts,log,last){
-  const P=pts.filter(p=>p.y!=null&&isFinite(p.y)&&(!log||p.y>0)&&p.w>0); if(P.length<SP_MIN_DAYS) return null;
-  const mw=P.reduce((s,p)=>s+p.w,0)/P.length; P.forEach(p=>p.w/=mw);
-  const Y=p=>log?Math.log(p.y):p.y, n=P.length; let sx=0,sy=0; P.forEach(p=>{sx+=p.w*p.x; sy+=p.w*Y(p);});
-  const mx=sx/n, my=sy/n; let sxx=0,sxy=0; P.forEach(p=>{sxx+=p.w*(p.x-mx)**2; sxy+=p.w*(p.x-mx)*(Y(p)-my);});
-  const b=sxx?sxy/sxx:0, a0=my-b*mx; let rss=0; P.forEach(p=>{rss+=p.w*(Y(p)-a0-b*p.x)**2;});
-  const D=h=>SP_DAMP*(1-Math.pow(SP_DAMP,h))/(1-SP_DAMP);
-  const s=Math.sqrt(rss/Math.max(1,n-2)), f=x=>x<=last?a0+b*x:a0+b*(last+D(x-last)), se=x=>s*Math.sqrt(1+1/n+(sxx?(x-mx)**2/sxx:0)), tr=v=>log?Math.exp(v):Math.max(0,v);
-  return {at:x=>tr(f(x)),lo:x=>tr(f(x)-1.28*se(x)),hi:x=>tr(f(x)+1.28*se(x))};
-}
-const spDen=m=>m==="ctr"||m==="cpm"?"impressions":m==="cpc"?"clicks":m.startsWith("cpa:")?m.slice(4):m.startsWith("cr:")?"installs":null;
-function spForecast(c){
-  const {info,M,hist,hFrom,to,recs}=c, a=aggregate(recs);
-  const days=[]; for(let d=hFrom; d<=to; d=addDays(d,1)) days.push(d);
-  const byDay={}; hist.forEach(r=>{(byDay[r.date]=byDay[r.date]||[]).push(r);});
-  const ctrFocus=/(^|,)\s*ctr\s*(,|$)/.test(info.headline_metrics||"");
-  const want=["cost"]; if((a.s.installs||0)>0) want.push("installs","cpa:installs");
-  S.events.filter(e=>(a.s[e]||0)>0).slice(0,3).forEach(e=>want.push(e,"cpa:"+e));
-  if(ctrFocus||want.length<3) want.push("clicks","ctr","cpc");
-  SP.cards=want.filter((m,i)=>want.indexOf(m)===i&&(M.includes(m)||m==="cpm")).map(m=>{
-    const den=spDen(m), vals=days.map(d=>{ if(!byDay[d]) return null; const g=aggregate(byDay[d]); if(den&&!(g.s[den]>0)) return null; const v=spVal(g,m); return v==null||!isFinite(v)?null:v; });
-    const pts=days.map((d,x)=>({x,y:vals[x],w:den&&byDay[d]?(aggregate(byDay[d]).s[den]||0):1}));
-    const fit=spFit(pts,isRatio(m),days.length-1); return fit?{m,vals,days,fit}:null; }).filter(Boolean);
-  if(!SP.cards.length) return spCard(`<div class="sp-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg><p>برای پیش‌بینی دست‌کم ${fa(SP_MIN_DAYS)} روز داده لازم است.</p></div>`);
-  const hi=["cpa:installs",...S.events.map(e=>"cpa:"+e),"ctr","cost"].map(m=>SP.cards.find(k=>k.m===m)).find(Boolean)||SP.cards[0];
-  hi.big=true; const rest=SP.cards.filter(k=>k!==hi);
-  const ctl=`<div class="sp-card rv sp-ctl"><div><h2 style="margin:0">اگر روند همین‌طور ادامه پیدا کند</h2><p class="sub" style="margin:2px 0 0">بر پایه روند روزانه ${jLong(hFrom)} تا ${jLong(to)}</p></div>
-    <div class="sp-seg" id="spHSeg" role="group" aria-label="چند روز آینده">${[3,7,14,30].map(h=>`<button type="button" data-h="${h}" aria-pressed="${SP.h===h}">${fa(h)} روز</button>`).join("")}</div>
-    <label class="sp-range"><input type="range" id="spH" min="1" max="30" step="1" value="${SP.h}" aria-label="تعداد روز آینده"><b id="spHLbl">${fa(SP.h)} روز</b></label></div>`;
-  const legend=`<div class="sp-legend"><span><i></i>واقعی</span><span><i class="dash"></i>پیش‌بینی</span><span><i class="band"></i>محدوده احتمالی</span></div>`;
-  const card=(k,i)=>{ const id="spFc"+SP.cards.indexOf(k); k.id=id; SP.draw[id]=()=>spFcDraw(k);
-    return spCard(`<div class="sp-fc"><div class="lbl">${esc(spLabel(k.m))}</div><div class="row"><span class="big" id="${id}v"></span><span id="${id}p"></span></div><div class="lbl" id="${id}s"></div></div>${k.big?legend:""}<div class="sp-chart ${k.big?"lg":"sm"}"><canvas id="${id}"></canvas></div>`,"",id,k.big?0:(i%3)*.06); };
-  return ctl+card(hi,0)+`<div class="sp-grid">${rest.map(card).join("")}</div>`
-    +`<p class="sp-foot" style="margin:0">پیش‌بینی فقط ادامه روند همین بازه است و تغییر بودجه، کمپین یا فصل را در نظر نمی‌گیرد.</p>`;
-}
-function spFcText(k){
-  const H=SP.h, last=k.days.length-1, cur=esc(clientInfo().currency||""), m=k.m, now=k.fit.at(last), at=k.fit.at(last+H);
-  const v=document.getElementById(k.id+"v"), p=document.getElementById(k.id+"p"), s=document.getElementById(k.id+"s"); if(!v) return;
-  const ch=now?at/now-1:null;
-  if(isRatio(m)){ v.innerHTML=spFmt(m,at)+spUnit(m,cur); s.textContent=`${fa(H)} روز بعد · الان حدود ${spFmt(m,now)}`; }
-  else { let sum=0; for(let i=1;i<=H;i++) sum+=k.fit.at(last+i); v.innerHTML=spFmt(m,sum)+spUnit(m,cur); s.textContent=`مجموع ${fa(H)} روز آینده · روزانه حدود ${spFmt(m,at)} در روز ${fa(H)}`; }
-  if(ch==null||!isFinite(ch)||Math.abs(ch)<0.01){ p.innerHTML=spPill("","تقریباً ثابت"); return; }
-  const good=m==="cost"?null:lowerBetter(m)?ch<0:ch>0;
-  p.innerHTML=spPill(good==null?"":good?"good":"warn",`${ch>0?"▲":"▼"} ${pctTxt(ch)} ${ch>0?"افزایش":"کاهش"}`);
-}
-function spFcData(k){
-  const H=SP.h, n=k.days.length, last=n-1, L=n+H, xs=[...Array(L).keys()];
-  const labels=xs.map(x=>jShort(addDays(k.days[0],x)));
-  const mid=xs.map(x=>x>=last?k.fit.at(x):null), top=spTop(k,mid);   /* the band is cut at the top so it cannot squash the lines */
-  return {labels,sets:[xs.map(x=>x>=last?(top?Math.min(top,k.fit.hi(x)):k.fit.hi(x)):null),xs.map(x=>x>=last?k.fit.lo(x):null),xs.map(x=>x<n?k.vals[x]:null),xs.map(x=>x<=last?k.fit.at(x):null),mid]};
-}
-function spTop(k,mid){ const seen=[...k.vals,...mid].filter(v=>v!=null&&isFinite(v)), mx=seen.length?Math.max(...seen):0; return mx>0?mx*1.35:undefined; }
-function spFcDraw(k){
-  const ac=accentColor(), d=spFcData(k), last=k.days.length-1, wash=alpha(ac,.06), axis=cssVar("--axis");
-  const nowLine={id:"spNow",beforeDatasetsDraw(ch){ const x=ch.scales.x.getPixelForValue(last), ar=ch.chartArea, g=ch.ctx; g.save(); g.fillStyle=wash; g.fillRect(x,ar.top,ar.right-x,ar.bottom-ar.top);
-      g.strokeStyle=axis; g.setLineDash([3,4]); g.beginPath(); g.moveTo(x,ar.top); g.lineTo(x,ar.bottom); g.stroke(); g.restore(); }};
-  const fm=v=>spFmt(k.m,v);
-  spChart(k.id,{type:"line",plugins:[nowLine],data:{labels:d.labels,datasets:[
-      {label:"band",data:d.sets[0],borderWidth:0,pointRadius:0,fill:"+1",backgroundColor:alpha(ac,.16),tension:.3},
-      {label:"lo",data:d.sets[1],borderWidth:0,pointRadius:0,fill:false,tension:.3},
-      {label:"واقعی",data:d.sets[2],borderColor:ac,backgroundColor:ac,borderWidth:2.5,pointRadius:k.big?3:0,pointHoverRadius:5,tension:.35,spanGaps:true},
-      {label:"روند",data:d.sets[3],borderColor:alpha(ac,.35),borderWidth:1.5,pointRadius:0,tension:0},
-      {label:"پیش‌بینی",data:d.sets[4],borderColor:ac,borderDash:[6,5],borderWidth:2.5,pointRadius:0,pointHoverRadius:5,tension:.3}]},
-    options:{interaction:{mode:"index",intersect:false},plugins:{legend:{display:false},tooltip:{...tooltipBase(),filter:x=>x.datasetIndex>=2&&x.parsed.y!=null&&!(x.datasetIndex===3),callbacks:{label:x=>` ${x.dataset.label}: ${fm(x.parsed.y)}`}}},
-      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:k.big?14:22,font:{size:k.big?12:10.5}}},y:spScale(fm,{ticks:{callback:fm,maxTicksLimit:k.big?5:3,font:{size:k.big?12:10.5}}})}}});
-}
-function spSetH(h){ SP.h=Math.max(1,Math.min(30,h|0));
-  document.getElementById("spHLbl").textContent=fa(SP.h)+" روز"; document.getElementById("spH").value=SP.h;
-  document.querySelectorAll("#spHSeg button").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.h===SP.h)));
-  SP.cards.forEach(k=>{ spFcText(k); const ch=SP.charts[k.id]; if(!ch) return; const d=spFcData(k); ch.data.labels=d.labels; ch.data.datasets.forEach((s,i)=>s.data=d.sets[i]); ch.update(); }); }
-function spForecastWire(){ const r=document.getElementById("spH"); if(!r) return;
-  r.oninput=()=>spSetH(+r.value); document.querySelectorAll("#spHSeg button").forEach(b=>b.onclick=()=>spSetH(+b.dataset.h));
-  SP.cards.forEach(spFcText); }
 
 /* ---------- export: a self-contained report for the current client and range ---------- */
 /* marker comments built from pieces, so no slash-star or double slash appears inside strings or regexes */
@@ -1833,8 +1734,8 @@ function pubsSnap(){ const ps=(DB.pubs||[]).filter(p=>p.client===S.client&&p.dat
   return [h,...ps.map(p=>[p.date,p.client,p.source,p.publisher,p.campaign,...ms.map(m=>p.m[m]||"")])]; }
 async function exportReport(mode){
   const special=mode==="special", client=mode==="client", lite=client||special, info=lite?Object.assign({},clientInfo(),{notes:""}):clientInfo();
-  /* the client copy also carries the period before, so its charts and tiles can compare; the special report also the 14 days its forecast reads */
-  let lo=lite?addDays(S.from,-(dayDiff(S.from,S.to)+1)):S.from; if(special&&addDays(S.to,-13)<lo) lo=addDays(S.to,-13);
+  /* the client copy also carries the period before, so its charts and tiles can compare */
+  const lo=lite?addDays(S.from,-(dayDiff(S.from,S.to)+1)):S.from;
   const rows=DB.rows.filter(r=>r.client===S.client&&r.date>=lo&&r.date<=S.to);
   const snap={generated:new Date().toISOString(),clients:[info],rows:rows.map(r=>[r.date,r.client,r.source,r.campaign_id,r.campaign,r.metric,r.value,r.pub||""]),pubs:lite?null:pubsSnap(),industry:special?[IND_HEAD,...industryRows(info).map(r=>IND_HEAD.map(k=>r[k]||""))]:null};
   const body=document.getElementById("repBody");
@@ -1845,7 +1746,7 @@ async function exportReport(mode){
     .replace(MARK("SNAPSHOT"),()=>CMT("SNAPSHOT")+JSON.stringify(snap)+CMT("END"))
     .replace(MARK("REPORT"),()=>CMT("REPORT")+JSON.stringify(rep)+CMT("END"))
     .replace(MARK("LOGOS"),()=>{const k=String(S.client).toLowerCase(), o={}; if(LOGOS[k]) o[k]=LOGOS[k]; return CMT("LOGOS")+JSON.stringify(o)+CMT("END");});  /* a client's report carries only its own logo */
-  const filename=`${special?"special-":client?"client-":""}report-${S.client}-${jParts(S.from).join("-")}_${jParts(S.to).join("-")}.html`;
+  const filename=`${special?"performance-":client?"client-":""}report-${S.client}-${jParts(S.from).join("-")}_${jParts(S.to).join("-")}.html`;
   const dl = window.claude&&window.claude.use ? await window.claude.use("downloads").catch(()=>null) : null;
   if(dl){
     try{ await dl.save({filename,data:html}); }
