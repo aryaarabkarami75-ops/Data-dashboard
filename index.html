@@ -1265,8 +1265,8 @@ function draftReport(info,recs,prevRecs,hasPrev,from,to){
   /* comparison with the period just before, when that data exists (Arya 2026-10-10) */
   if(hasPrev&&(b.s.cost||0)>0){
     const prevTo=addDays(from,-1), prevFrom=addDays(from,-days), li=[];
-    /* when one period has fewer days of data, volumes are compared as daily averages so the gap is not mistaken for growth */
-    const nd=rs=>new Set(rs.filter(r=>(r.m.cost||0)>0).map(r=>r.date)).size, dC=nd(recs)||1, dP=nd(prevRecs)||1, perDay=dC!==dP;
+    /* a past day with no data was a day the campaigns were not running (Arya 2026-10-17), so both periods compare as plain totals */
+    const dC=1, dP=1, perDay=false;
     const vol=(v,n)=>perDay?v/n:v, volTxt=perDay?" (میانگین روزانه)":"";
     /* positive but truthful (Arya 2026-10-10): wins first and named as wins; dips keep their numbers but no drop percentage, and close with what is being done */
     const good=[], flat=[], dip=[];
