@@ -483,7 +483,6 @@ html:has(body.special){scroll-behavior:smooth}
     </nav>
     <section class="sp-panel" id="spOv" role="tabpanel" aria-label="نمای کلی"></section>
     <section class="sp-panel" id="spIndP" role="tabpanel" aria-label="مقایسه با صنعت" hidden></section>
-    <footer class="sp-foot" id="spFoot"></footer>
   </section>
 </div>
 
@@ -1669,7 +1668,6 @@ function renderSpecial(c){
   document.getElementById("spOv").innerHTML=spOverview(c);
   const ind=spIndustry(c); document.getElementById("spIndP").innerHTML=ind;
   const hasInd=!!ind; document.getElementById("spTabs").hidden=!hasInd; document.getElementById("specialView").classList.toggle("one",!hasInd); if(!hasInd) SP.tab="ov";   /* no industry rows: the overview alone, without tabs */
-  document.getElementById("spFoot").textContent=`گزارش عملکرد تبلیغات ${name} · ساخته‌شده در ${jLong(REPORT?REPORT.made:new Date().toISOString().slice(0,10))}`;
   spShow(SP.tab,false);
 }
 
@@ -1722,7 +1720,8 @@ function spIndustry(c){
     const lb=lowerBetter(m); return {m,avg:v,ours,lb,gap:lb?v/ours-1:ours/v-1}; }).filter(Boolean);   /* gap > 0: better than the industry */
   if(!ms.length) return "";
   const ac=accentColor(), gray=cssVar("--other"), ink=cssVar("--ink-2");
-  const tile=(o,i)=>{ const pill=o.gap>=0.03?spPill("good",`${pctTxt(o.gap)} بهتر از میانگین صنعت`):o.gap>-0.03?spPill("","هم‌سطح میانگین صنعت"):spPill("warn",`${pctTxt(o.gap)} تا میانگین صنعت`);
+  /* wording from Arya (2026-10-17): higher / lower than the industry average, by the value itself; colour still says better or worse */
+  const tile=(o,i)=>{ const d=o.ours/o.avg-1, pill=spPill(o.gap>=0?"good":"warn",`${pctTxt(d)} ${d>=0?"بالاتر از میانگین صنعت":"پایین‌تر از میانگین صنعت"}`);
     return `<div class="sp-stat rv" style="--d:${(i*0.05).toFixed(2)}s"><div class="k">${esc(spLabel(o.m))}</div><div class="v">${spNum(o.m,o.ours)}${spUnit(o.m,esc(info.currency||""))}</div><div class="sp-rank">میانگین صنعت ${spFmt(o.m,o.avg)}</div>${pill}</div>`; };
   /* funnel steps: rates whose base is the step before (clicks per impression, installs per click, ...) */
   const ORDER=["impressions","clicks","installs","Register","KYC","Buy+Sell"], key=m=>m==="ctr"?["clicks","impressions"]:m.startsWith("rate:")?rateParts(m).map(x=>x.join("+")):null;
