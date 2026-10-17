@@ -915,11 +915,13 @@ function render(){
   TRACK_DATES=new Set(rowsAll.filter(r=>isTracker(r.source)||!CORE.includes(r.metric)).map(r=>r.date));
   const dates=[...new Set(rowsAll.map(r=>r.date))].sort();
   const minD=dates[0], maxD=dates[dates.length-1];
-  if(!S.to||S.to>maxD||S.to<minD) S.to=maxD;
+  /* the range can run to the latest day any client has data for: a day this client has nothing for was a day it was not active (Arya 2026-10-17) */
+  const lastD=DB.rows.reduce((m,r)=>r.date>m?r.date:m,maxD);
+  if(!S.to||S.to>lastD||S.to<minD) S.to=maxD;
   if(S.preset>0){ S.from=addDays(S.to,-(S.preset-1)); if(S.from<minD) S.from=minD; }
   else if(S.preset===0||!S.from||S.from<minD||S.from>S.to) S.from=minD;
   const from=S.from,to=S.to;
-  cal.dates=new Set(dates); cal.min=minD; cal.max=maxD;
+  cal.dates=new Set(dates); cal.min=minD; cal.max=lastD;
 
   const brand=brandOf(info);
   document.getElementById("title").textContent=(brand.src?"گزارش عملکرد تبلیغات ":"داشبورد ")+(info.display_name||S.client);
