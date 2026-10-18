@@ -196,6 +196,8 @@ body.page-report .dash-only{display:none!important}
 .rep-stat .v{font-size:21px;font-weight:800;line-height:1.35}
 .rep-stat .d{font-size:12px}
 .rep-chart{position:relative;height:260px}
+#repPrintTbl{display:none}
+@media print{#repPrintTbl.on{display:block;break-inside:avoid;margin-top:10px}#repPrintTbl table{width:100%;border-collapse:collapse;font-size:9.5px}#repPrintTbl th,#repPrintTbl td{border-bottom:1px solid #ddd;padding:2px 6px;text-align:start;font-variant-numeric:tabular-nums}}
 .rep-body{font-size:15px;line-height:2;outline:0;border-radius:10px;padding:4px 8px;margin:-4px -8px}
 .rep-body[contenteditable="true"]:hover{box-shadow:0 0 0 1px var(--line)}
 .rep-body[contenteditable="true"]:focus{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
@@ -447,6 +449,7 @@ html:has(body.special){scroll-behavior:smooth}
       </header>
       <div class="rep-stats" id="repStats"></div>
       <div class="rep-chart"><canvas id="repChart"></canvas></div>
+      <div id="repPrintTbl"></div>
       <div class="rep-body" id="repBody" contenteditable="true" spellcheck="false"></div>
     </article>
   </section>
@@ -616,9 +619,36 @@ let charts = {};
 /* charts are drawn at screen width; redraw them at page width when printing, or the PDF cuts them off */
 /* an A4 page is about 700px wide, so the chart is redrawn at that size for printing and back afterwards */
 const printCharts=on=>Object.values(charts).forEach(c=>{ try{ if(!c) return; if(on){ const box=c.canvas.parentNode; c.resize(Math.min(680,box.clientWidth||680),box.clientHeight||260); } else c.resize(); }catch(e){} });
+/* the printed PDF writes each bar's and point's exact number on it, on every chart (Arya 2026-10-18); the screen stays clean */
+let PRINT_LABELS=false;
+const valueLabels={id:"valueLabels",afterDatasetsDraw(chart){
+  if(!PRINT_LABELS) return;
+  const ctx=chart.ctx, horiz=chart.options.indexAxis==="y"; ctx.save(); ctx.font="600 9px "+(Chart.defaults.font.family||"sans-serif"); ctx.lineJoin="round";
+  /* bars: the number runs up inside the bar in white (above it when the bar is too short); lines: above each point in the line's colour, with a white edge.
+     With more than 14 points the line numbers would pile up, so they are left out and the report adds a table of the days instead */
+  const say=(t,x,y,col,halo)=>{ if(halo){ ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.lineWidth=3; ctx.strokeText(t,x,y); } ctx.fillStyle=col; ctx.fillText(t,x,y); };
+  chart.data.datasets.forEach((ds,i)=>{ const meta=chart.getDatasetMeta(i), type=ds.type||chart.config.type; if(meta.hidden||!["bar","line"].includes(type)) return;
+    if(type==="line"&&meta.data.length>14) return;
+    const sc=chart.scales[horiz?meta.xAxisID:meta.yAxisID], cb=sc&&sc.options.ticks&&sc.options.ticks.callback;
+    const pct=(()=>{ try{ return !!(cb&&/٪|%/.test(String(cb.call(sc,0.5,0,[])))); }catch(e){ return false; } })();
+    const col=typeof ds.borderColor==="string"&&type==="line"?ds.borderColor:"#333";
+    meta.data.forEach((el,j)=>{ const raw=ds.data[j], v=raw&&typeof raw==="object"?(horiz?raw.x:raw.y):raw; if(v==null||!isFinite(v)) return;
+      const t=pct?faPct(v):fa(v,Math.abs(v)<10&&v%1?2:0), w=ctx.measureText(t).width;
+      if(horiz){ ctx.textAlign="left"; ctx.textBaseline="middle"; say(t,el.x+4,el.y,"#333",true); return; }
+      if(type==="bar"){ const h=Math.abs(el.base-el.y); ctx.save(); ctx.translate(el.x,el.y); ctx.rotate(-Math.PI/2); ctx.textBaseline="middle";
+        if(h>=w+8){ ctx.textAlign="right"; say(t,-4,0,"#fff",false); } else { ctx.textAlign="left"; say(t,4,0,"#333",true); } ctx.restore(); return; }
+      ctx.textAlign="center"; ctx.textBaseline="bottom"; say(t,el.x,el.y-5,col,true); }); });
+  ctx.restore(); }};
+const printLabels=on=>{ PRINT_LABELS=on; if(window.Chart) Object.values(Chart.instances||{}).forEach(c=>{ try{
+  /* room above the tallest bar or point for its number */
+  if(["bar","line"].includes(c.config.type)) Object.entries(c.options.scales||{}).forEach(([k,o])=>{ if(k!=="x"&&!(c.options.indexAxis==="y"&&k==="y")&&o.type!=="logarithmic") o.grace=on?"18%":0; });
+  c.update("none"); }catch(e){} }); };
+if(window.Chart) Chart.register(valueLabels);
+window.addEventListener("beforeprint",()=>printLabels(true));
+window.addEventListener("afterprint",()=>printLabels(false));
 window.addEventListener("beforeprint",()=>printCharts(true));
 window.addEventListener("afterprint",()=>printCharts(false));
-try{ window.matchMedia("print").addEventListener("change",e=>printCharts(e.matches)); }catch(e){}
+try{ window.matchMedia("print").addEventListener("change",e=>{ printLabels(e.matches); printCharts(e.matches); }); }catch(e){}
 
 function loadSnapshot(src){
   return { clients: src.clients, rows: src.rows.map(r=>({date:r[0],client:r[1],source:r[2],campaign_id:r[3],campaign:r[4],metric:r[5],value:+r[6]||0,pub:r[7]||""})),
@@ -1407,6 +1437,9 @@ function renderReportPage(info,recs,prevRecs,hasPrev,span,from,to,M,brand){
   const ds=[{type:"bar",label:"هزینه",data:days.map(d=>byDay[d]?aggregate(byDay[d]).s.cost||null:null),backgroundColor:alpha(ac,.6),borderRadius:4,yAxisID:"y",order:2},
     ...cpas.map(([m,k],i)=>({type:"line",label:k,data:days.map(d=>byDay[d]?value(aggregate(byDay[d]),m):null),borderColor:lineCols[i%lineCols.length],backgroundColor:lineCols[i%lineCols.length],borderWidth:2,tension:.3,pointRadius:3,spanGaps:false,yAxisID:"y2",order:1}))];
   const sw=cpas.map(([m])=>switchFor(m,from,to)).find(Boolean);
+  /* over 14 days the printed chart cannot hold every line's numbers, so the PDF lists the days in a table under it */
+  const pt=document.getElementById("repPrintTbl"); pt.classList.toggle("on",cpas.length>0&&days.length>14);
+  pt.innerHTML=cpas.length&&days.length>14?`<table><thead><tr><th>روز</th>${ds.map(d=>`<th>${esc(d.label)}</th>`).join("")}</tr></thead><tbody>${days.map((d,i)=>`<tr><td>${jShort(d)}</td>${ds.map(x=>`<td>${fa(x.data[i])}</td>`).join("")}</tr>`).join("")}</tbody></table>`:"";
   charts.rep&&charts.rep.destroy();
   charts.rep=new Chart(document.getElementById("repChart"),{plugins:sw?[switchLine(days.indexOf(sw.at),`تغییر تگ: ${label(sw.from)} ← ${label(sw.to)}`)]:[],data:{labels:days.map(jShort),datasets:ds},
     options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:c=>` ${c.dataset.label}: ${fa(c.parsed.y)}`}}},
@@ -1893,7 +1926,7 @@ async function shareReport(mode){
 
 /* start right away; draw the charts whenever the chart library arrives (inside Google Apps Script it can load after this script) */
 boot().catch(e=>{ statusNote="خطا: "+(e&&e.message||e); try{setStatus();}catch(_){} });
-if(!window.Chart){ const iv=setInterval(()=>{ if(window.Chart){ clearInterval(iv); try{render();}catch(e){} } },150); setTimeout(()=>clearInterval(iv),30000); }
+if(!window.Chart){ const iv=setInterval(()=>{ if(window.Chart){ clearInterval(iv); try{ Chart.register(valueLabels); render();}catch(e){} } },150); setTimeout(()=>clearInterval(iv),30000); }
 })();
 </script>
 
