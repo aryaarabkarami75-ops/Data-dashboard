@@ -673,7 +673,7 @@ async function startConnector(){
   if(!MCP) return false;
   const opts={refetchInterval:300000};
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"data!A1:I"},onSheet("data"),opts);
-  MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"clients!A1:L"},onSheet("clients"),opts);
+  MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"clients!A1:M"},onSheet("clients"),opts);
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"reports!A1:E"},onSheet("reports"),opts);
   MCP.watchTool(SHEETS,"get_values",{spreadsheetId:CONFIG.sheetId,range:"publishers!A1:Z"},onSheet("publishers"),opts);
   return true;
@@ -757,8 +757,14 @@ async function saveTargets(info){
     note.textContent="در شیت ذخیره شد.";
   }catch(e){ note.textContent=(e&&e.code&&ERR_COPY[e.code])||("ذخیره نشد"+(e&&e.message?": "+e.message:"")); }
 }
-function clientInfo(){return DB.clients.find(c=>c.client===S.client)||{client:S.client,display_name:S.client,currency:"",headline_metrics:""};}
-function clientRows(){ const rows=DB.rows.filter(r=>r.client===S.client), sw=METRIC_SWITCH[S.client]; if(!sw) return rows;
+function clientInfo(){ const c=DB.clients.find(c=>c.client===S.client)||{client:S.client,display_name:S.client,currency:"",headline_metrics:""}, off=hiddenNow(c);
+  if(!off.size) return c;  /* a range inside a hide rule drops those metrics from the tiles and the text */
+  return Object.assign({},c,{headline_metrics:String(c.headline_metrics||"").split(",").map(x=>x.trim()).filter(m=>m&&!off.has(m.replace(/^cpa:/,""))).join(",")}); }
+function hiddenNow(info){ const off=new Set(); hideRules(info).forEach(h=>{ if(S.from&&h.from<=S.from&&h.to>=S.to) h.ms.forEach(m=>off.add(m)); }); return off; }
+/* clients tab column "hide": metrics left out of the dashboard for some days, e.g. "sign_up,loan_request,sessions@2026-10-10..2026-10-16"
+   (Arya 2026-10-18: GSM 18-24 Mehr reports only the cost file until more data comes). The rows stay in the sheet. */
+function hideRules(info){ return String((info&&info.hide)||"").split(/[;\n]/).map(p=>{ const m=p.trim().match(/^(.+?)@(\d{4}-\d\d-\d\d)\.\.(\d{4}-\d\d-\d\d)$/); return m&&{ms:new Set(m[1].split(",").map(x=>x.trim())),from:m[2],to:m[3]}; }).filter(Boolean); }
+function clientRows(){ const hr=hideRules(DB.clients.find(c=>c.client===S.client)), rows=DB.rows.filter(r=>r.client===S.client&&!hr.some(h=>h.ms.has(r.metric)&&r.date>=h.from&&r.date<=h.to)), sw=METRIC_SWITCH[S.client]; if(!sw) return rows;
   return rows.concat(rows.filter(r=>r.metric===(r.date<sw.at?sw.from:sw.to)).map(r=>({...r,metric:sw.key}))); }
 /* the switch marker and note for a chart of metric m over from..to, or null */
 function switchFor(m,from,to){ const sw=METRIC_SWITCH[S.client]; if(!sw||(m!==sw.key&&m!=="cpa:"+sw.key)||sw.at<=from||sw.at>to) return null;
@@ -922,7 +928,7 @@ function render(){
   if(!clients.includes(S.client)) S.client=clients[0]||null;
   renderClientTabs(clients);
   if(!S.client){document.getElementById("kpis").innerHTML='<div class="empty">هنوز داده‌ای در شیت نیست.</div>';return;}
-  const info=clientInfo(); TARGETS=Object.assign(parseTargets(info.cpa_targets),REPORT?{}:store.get("targets:"+S.client,{})); setAliases(info.campaign_aliases); setGroups(info.campaign_groups); const rowsAll=clientRows();
+  let info=clientInfo(); TARGETS=Object.assign(parseTargets(info.cpa_targets),REPORT?{}:store.get("targets:"+S.client,{})); setAliases(info.campaign_aliases); setGroups(info.campaign_groups); let rowsAll=clientRows();
   /* days that have results (tracker rows, or conversions the ad network itself reports, e.g. Yektanet tag events) */
   TRACK_DATES=new Set(rowsAll.filter(r=>isTracker(r.source)||!CORE.includes(r.metric)).map(r=>r.date));
   const dates=[...new Set(rowsAll.map(r=>r.date))].sort();
@@ -933,6 +939,10 @@ function render(){
   if(S.preset>0){ S.from=addDays(S.to,-(S.preset-1)); if(S.from<minD) S.from=minD; }
   else if(S.preset===0||!S.from||S.from<minD||S.from>S.to) S.from=minD;
   const from=S.from,to=S.to;
+  /* a range that sits inside a hide rule (clients tab column hide) drops those metrics from the whole view, so tiles and text never show it half-counted */
+  const off=hiddenNow(DB.clients.find(c=>c.client===S.client)), offKey=[...off].sort().join(",");
+  if(off.size){ rowsAll=rowsAll.filter(r=>!off.has(r.metric)); info=clientInfo(); }
+  if((S.offKey||"")!==offKey){ S.offKey=offKey; S.events=null; }
   cal.dates=new Set(dates); cal.min=minD; cal.max=lastD;
 
   const brand=brandOf(info);
