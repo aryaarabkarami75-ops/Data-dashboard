@@ -830,8 +830,11 @@ function pivot(rows, idx){
     if(r.metric==="cost"){ const pay=PAYS[memberKey(r.campaign)]; if(pay) o.m["cost>"+pay]=(o.m["cost>"+pay]||0)+r.value; } }
   return [...map.values()];
 }
+/* rows left out of CTR when other rows have reach (Arya 2026-10-20: Extreme Walls' Rubika fixed buys); alone, they still show their own CTR */
+const CTR_EXCLUDE = { ExtremeWalls:o=>/rubika|روبیکا/i.test([o.campaign||"",o.pub||"",...(o.camps||[])].join(" ")) };
+const ctrOut=o=>{ const f=CTR_EXCLUDE[S.client]; return !!f&&f(o); };
 function aggregate(recs){
-  const s={}, ctrC={c:0,i:0}, cpcC={cost:0,c:0}; let costT=0; const costBy={};
+  const s={}, ctrC={c:0,i:0}, ctrA={c:0,i:0}, cpcC={cost:0,c:0}; let costT=0; const costBy={};
   /* a client whose event changed: each event's CPA only uses cost from its own period (Arya 2026-10-13, Gvest only) */
   const sw=METRIC_SWITCH[S.client], costSw={};
   /* the Winzy-style split (each member's cost pays only for its own result) applies inside one campaign;
@@ -840,9 +843,9 @@ function aggregate(recs){
   for(const o of recs){ for(const k in o.m) s[k]=(s[k]||0)+o.m[k];
     if(TRACK_DATES.has(o.date)){ costT+=o.m.cost||0; if(sw){ const e=o.date<sw.at?sw.from:sw.to; costSw[e]=(costSw[e]||0)+(o.m.cost||0); } /* a grouped campaign pays for each earmarked result with only that member's cost */
       if(oneCamp) for(const k in o.m) if(k.startsWith("cost>")) costBy[k.slice(5)]=(costBy[k.slice(5)]||0)+o.m[k]-(o.m.cost||0); }
-    if((o.m.impressions||0)>0){ctrC.c+=o.m.clicks||0;ctrC.i+=o.m.impressions;}
+    if((o.m.impressions||0)>0){ctrA.c+=o.m.clicks||0;ctrA.i+=o.m.impressions; if(!ctrOut(o)){ctrC.c+=o.m.clicks||0;ctrC.i+=o.m.impressions;}}
     if("clicks" in o.m){cpcC.cost+=o.m.cost||0;cpcC.c+=o.m.clicks;} }
-  return {s,ctrC,cpcC,costT,costBy,costSw:sw?costSw:null};
+  return {s,ctrC:ctrC.i?ctrC:ctrA,ctrOut:ctrC.i>0&&ctrC.i<ctrA.i,cpcC,costT,costBy,costSw:sw?costSw:null};
 }
 function value(agg,m){
   const s=agg.s;
@@ -1314,7 +1317,7 @@ function draftReport(info,recs,prevRecs,hasPrev,from,to){
   if(inst&&TARGETS["cpa:installs"]&&cpi<=TARGETS["cpa:installs"]) p+=` این عدد ${pctTxt(1-cpi/TARGETS["cpa:installs"])} بهتر از هدف تعیین‌شده (${fa(TARGETS["cpa:installs"])}) است.`;
   const ctr=value(a,"ctr"), clk=a.s.clicks||0, imp=a.s.impressions||0;
   const ctrFocus=/(^|,)\s*ctr\s*(,|$)/.test(info.headline_metrics||"")||(!inst&&!S.events.some(e=>(a.s[e]||0)>0));
-  if(ctrFocus&&clk) p+=` این کمپین‌ها <b>${fa(imp)} نمایش</b> و <b>${fa(clk)} کلیک</b> داشتند${ctr!=null?` و نرخ کلیک (CTR) کل بازه <b>${faPct(ctr)}</b> بود`:""}.`;
+  if(ctrFocus&&clk) p+=` این کمپین‌ها <b>${fa(imp)} نمایش</b> و <b>${fa(clk)} کلیک</b> داشتند${ctr!=null?` و نرخ کلیک (CTR) کل بازه <b>${faPct(ctr)}</b> بود`:""}.`+(ctrFocus&&a.ctrOut&&S.client==="ExtremeWalls"?" نرخ‌های کلیک این گزارش بدون خریدهای ثابت روبیکا محاسبه شده‌اند.":"");
   H.push("<h3>خلاصه عملکرد</h3><p>"+p+"</p>");
   const ctrHalf=(()=>{ if(!ctrFocus) return null; const bd={}; recs.forEach(r=>{(bd[r.date]=bd[r.date]||[]).push(r);});
     const dl=Object.keys(bd).sort().map(d=>aggregate(bd[d])).map(g=>({c:value(g,"ctr"),i:g.s.impressions||0})).filter(x=>x.c!=null&&x.i>0); if(dl.length<2) return null;
@@ -1356,7 +1359,7 @@ function draftReport(info,recs,prevRecs,hasPrev,from,to){
       t+=`بالاترین نرخ کلیک روزانه در <b>${jDow(best.d)} ${jLong(best.d)}</b> با ${faPct(best.c)} ثبت شد.`;
       if(c1&&c2){ const ch=c2/c1-1; t+= ch>=0.03?` نرخ کلیک در نیمه دوم بازه ${pctTxt(ch)} بالاتر از نیمه اول بود که نشان می‌دهد پیام‌ها بهتر دیده و کلیک شده‌اند.`:ch>-0.03?` نرخ کلیک در طول بازه ثابت ماند.`:` با تازه‌سازی بنرها و پیام‌ها، نرخ کلیک نیمه دوم بازه دوباره به سطح روزهای ابتدایی بازمی‌گردد.`; } }
     const per2=new Map(); recs.forEach(r=>{(per2.get(r.ck)||per2.set(r.ck,{name:r.campaign,recs:[]}).get(r.ck)).recs.push(r);});
-    const cc=[...per2.values()].map(c=>{const g=aggregate(c.recs);return {name:c.name,i:g.s.impressions||0,c:value(g,"ctr")};}).filter(c=>c.c!=null&&c.i>=Math.max(1000,imp*0.03));
+    const cc=[...per2.values()].map(c=>{const g=aggregate(c.recs);return {name:c.name,i:g.s.impressions||0,c:value(g,"ctr")};}).filter(c=>c.c!=null&&c.i>=Math.max(1000,(a.ctrC.i||imp)*0.03)&&!ctrOut({campaign:c.name}));
     if(cc.length>=2){ const s=[...cc].sort((x,y)=>y.c-x.c), top=s.slice(0,2), low=s[s.length-1];
       t+=` در میان کمپین‌ها، ${top.map(c=>`<b>${esc(c.name)}</b> (${faPct(c.c)})`).join(" و ")} بالاترین نرخ کلیک را داشتند`;
       t+= !top.includes(low)?`؛ کمپین <b>${esc(low.name)}</b> (${faPct(low.c)}) بیشترین ظرفیت رشد را دارد.`:"."; }
