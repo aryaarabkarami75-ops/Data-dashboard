@@ -538,9 +538,13 @@ const LABELS = {
    so both periods compare on one line; charts of it mark the switch (Arya 2026-10-13: Gvest moved from tag "actions" to "sign_up" on 18 Mehr) */
 const METRIC_SWITCH = { Gvest:{key:"conv", from:"actions", to:"sign_up", at:"2026-10-10"} };
 /* clients whose reports show channel sections instead of one line per campaign (Arya 2026-10-17: Daric = Cafe Bazaar and app ads) */
-const REPORT_SPLIT = { Daric:[{name:"کافه‌بازار",has:ch=>ch==="yektanet-cafe"},{name:"تبلیغات اپ",has:()=>true}] };
+const REPORT_SPLIT = { Daric:[{name:"کافه‌بازار",has:ch=>ch==="yektanet-cafe"},{name:"تبلیغات اپ",has:()=>true}],
+  /* Extreme Walls: one section per Yektanet ad type, from the campaign name prefix or the type name of the full-report rows (Arya 2026-10-20) */
+  ExtremeWalls:[{name:"ویدیویی",has:(ch,r)=>/^v-|ویدیو/.test(r.campaign)},{name:"پویا",has:(ch,r)=>/^p-|پویا/.test(r.campaign)},
+    {name:"درون‌اپلیکیشنی",has:(ch,r)=>/^app-|surush|درون/.test(r.campaign)},{name:"نشان",has:(ch,r)=>/neshan|نشان/.test(r.campaign)},
+    {name:"روبیکا",has:(ch,r)=>/rubika|روبیکا/.test(r.campaign)},{name:"سایر",has:()=>true}] };
 function reportSplit(recs){ const def=REPORT_SPLIT[S.client]; if(!def) return null;
-  const out=def.map(d=>({name:d.name,recs:[]})); recs.forEach(r=>out[def.findIndex(d=>d.has(r.channel))].recs.push(r));
+  const out=def.map(d=>({name:d.name,recs:[]})); recs.forEach(r=>out[def.findIndex(d=>d.has(r.channel,r))].recs.push(r));
   return out.filter(g=>g.recs.length).map(g=>({...g,a:aggregate(g.recs)})); }
 const SOURCE_LABELS = { yektanet:"یکتانت", "yektanet-cafe":"یکتانت (کافه‌بازار)", adtrace:"ادتریس", appmetrica:"اپ‌متریکا", metrix:"متریکس", ga4:"گوگل آنالیتیکس", gsm:"پنل جی‌اس‌ام" };
 const CORE = ["cost","impressions","clicks"];
@@ -1384,8 +1388,15 @@ function draftReport(info,recs,prevRecs,hasPrev,from,to){
   if(split){ const li=split.map(g=>{ const ci=value(g.a,"cpa:installs"), gi=g.a.s.installs||0, parts=[`هزینه <b>${compact(g.a.s.cost||0)} ${cur}</b>`];
       if(gi) parts.push(`<b>${fa(gi)} نصب</b> (${pctTxt(gi/(inst||1))} از کل)`+(ci?` با CPI <b>${fa(ci)}</b>`:""));
       evs.slice(0,2).forEach(e=>{ const n=g.a.s[e]||0, c=value(g.a,"cpa:"+e); if(n) parts.push(`${fa(n)} ${esc(evName(e))}`+(c?` (هر مورد ${fa(c)} ${cur})`:"")); });
+      if(ctrFocus&&(g.a.s.clicks||0)>0){ const gc=value(g.a,"ctr"); parts.push(`${fa(g.a.s.impressions||0)} نمایش و ${fa(g.a.s.clicks)} کلیک`+(gc!=null?` با CTR <b>${faPct(gc)}</b>`:"")); }
       return `<li><b>${esc(g.name)}</b>: ${parts.join("، ")}</li>`; }).join("");
-    H.push(`<h3>${split.map(g=>esc(g.name)).join(" و ")}</h3><ul>${li}</ul>`); }
+    H.push(`<h3>${split.length>2?"به تفکیک نوع تبلیغ":split.map(g=>esc(g.name)).join(" و ")}</h3><ul>${li}</ul>`); }
+  /* publishers, for CTR-led clients whose ad network report names the sites and apps (Extreme Walls full report, 2026-10-20) */
+  const ps=ctrFocus?pubSummary(from,to):null;
+  if(ps&&ps.top.length>=3){ let t=`تبلیغات روی <b>${fa(ps.n)} سایت و اپلیکیشن</b> نمایش داده شد. بیشترین کلیک از ${ps.top.slice(0,3).map(x=>`<b>${esc(x.p)}</b> (${fa(x.clk)} کلیک)`).join("، ")} آمد.`;
+    const hc=ps.ctr.filter(x=>!ps.top.slice(0,3).some(y=>y.p===x.p)).slice(0,2);
+    if(hc.length) t+=` ${hc.map(x=>`<b>${esc(x.p)}</b> با CTR ${faPct(x.ctr)}`).join(" و ")} بیشترین نرخ کلیک را در میان پابلیشرهای پرنمایش داشتند.`;
+    H.push("<h3>پابلیشرهای برتر</h3><p>"+t+"</p>"); }
   /* campaigns */
   const per=new Map(); recs.forEach(r=>{(per.get(r.ck)||per.set(r.ck,{name:r.campaign,recs:[]}).get(r.ck)).recs.push(r);});
   const camps=[...per.values()].map(c=>{const g=aggregate(c.recs);return {name:c.name,inst:g.s.installs||0,cpi:value(g,"cpa:installs"),g};}).filter(c=>c.inst>0&&c.cpi);
@@ -1744,29 +1755,36 @@ function spOverview(c){
   /* daily cost as bars with a line per cost-per-result, like the client report */
   const days=[]; for(let d=from; d<=to; d=addDays(d,1)) days.push(d);
   const byDay={}; recs.forEach(r=>{(byDay[r.date]=byDay[r.date]||[]).push(r);});
-  const cpas=stats.filter(m=>m.startsWith("cpa:"));
+  const cpas=stats.filter(m=>m.startsWith("cpa:")||(ctrFocus&&m==="ctr"));   /* CTR-led clients: the CTR line in place of cost per result */
   const ac=accentColor(), lineCols=["--s1","--s2","--s3","--s7","--s4"].map(cssVar).filter(x=>hueGap(x,ac)>40);
   SP.draw.spOvDaily=()=>spChart("spOvDaily",{data:{labels:days.map(jShort),datasets:[
       {type:"bar",label:"هزینه",data:days.map(d=>byDay[d]?aggregate(byDay[d]).s.cost||null:null),backgroundColor:spGrad(ac,.25,.85),borderRadius:6,yAxisID:"y",order:2},
       ...cpas.map((m,i)=>({type:"line",label:spLabel(m),data:days.map(d=>byDay[d]?value(aggregate(byDay[d]),m):null),borderColor:lineCols[i%lineCols.length],backgroundColor:lineCols[i%lineCols.length],borderWidth:2.5,tension:.35,pointRadius:3,pointHoverRadius:6,yAxisID:"y2",order:1}))]},
-    options:{interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:x=>` ${x.dataset.label}: ${fa(x.parsed.y)}`}}},
-      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:12}},y:spScale(null,{title:{display:true,text:"هزینه"+(cur?" ("+cur+")":"")}}),y2:spScale(null,{display:cpas.length>0,position:"right",grid:{display:false}})}}});
+    options:{interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:x=>` ${x.dataset.label}: ${x.dataset.yAxisID==="y2"&&cpas.every(m=>m==="ctr")?faPct(x.parsed.y):fa(x.parsed.y)}`}}},
+      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:12}},y:spScale(null,{title:{display:true,text:"هزینه"+(cur?" ("+cur+")":"")}}),y2:spScale(cpas.every(m=>m==="ctr")&&cpas.length?(v=>faPct(v)):null,{display:cpas.length>0,position:"right",grid:{display:false}})}}});
   /* channel sections for clients that want them, else campaigns ranked by the main result */
   const split=reportSplit(recs);
   const r0=(a.s.installs||0)>0?"installs":S.events.find(e=>(a.s[e]||0)>0)||((a.s.clicks||0)>0?"clicks":"cost");
   const per=new Map(); recs.forEach(r=>{(per.get(r.ck)||per.set(r.ck,{name:r.campaign,recs:[]}).get(r.ck)).recs.push(r);});
   const camps=[...per.values()].map(p=>{const g=aggregate(p.recs); return {name:p.name,n:g.s[r0]||0,c:r0==="cost"?null:spVal(g,r0==="clicks"?"cpc":"cpa:"+r0)};}).filter(x=>x.n>0&&!split).sort((x,y)=>y.n-x.n).slice(0,8);
   let splitCard="";
-  if(split){ const sm=["cost","installs","cpa:installs",...S.events.filter(e=>(a.s[e]||0)>0).slice(0,2).flatMap(e=>[e,"cpa:"+e])].filter(m=>split.some(g=>spVal(g.a,m)!=null));
+  if(split){ const sm=["cost","installs","cpa:installs",...S.events.filter(e=>(a.s[e]||0)>0).slice(0,2).flatMap(e=>[e,"cpa:"+e]),...(ctrFocus?["impressions","clicks","ctr"]:[])].filter(m=>split.some(g=>spVal(g.a,m)!=null));
     splitCard=`<div class="sp-split">${split.map(g=>`<div><h3>${esc(g.name)}</h3>${sm.map(m=>{ const v=spVal(g.a,m), tot=spVal(a,m), sh=!isRatio2(m)&&tot?v/tot:null;
         return `<div class="row"><span>${esc(spLabel(m))}</span><b>${spNum(m,v)}${spUnit(m,cur)}</b>${sh!=null?`<i style="--w:${Math.round(sh*100)}%"></i>`:""}</div>`; }).join("")}</div>`).join("")}</div>`; }
   if(camps.length>1) SP.draw.spOvCamp=()=>spChart("spOvCamp",{type:"bar",data:{labels:camps.map(x=>x.name),datasets:[{label:spLabel(r0),data:camps.map(x=>x.n),backgroundColor:camps.map((_,i)=>alpha(ac,Math.max(.3,.9-i*.08))),borderRadius:8,barThickness:"flex",maxBarThickness:26}]},
     options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{...tooltipBase(),callbacks:{label:x=>{ const k=camps[x.dataIndex]; return [` ${spLabel(r0)}: ${spFmt(r0,k.n)}`,...(k.c?[` هزینه هر مورد: ${fa(k.c)}`]:[])]; }}}},
       scales:{x:spScale(v=>spFmt(r0,v)),y:{grid:{display:false},border:{display:false},ticks:{autoSkip:false,font:{size:11.5}}}}}});
+  const ps=ctrFocus?pubSummary(from,to):null;
+  if(ps&&ps.top.length>=3) SP.draw.spOvPub=()=>spChart("spOvPub",{type:"bar",data:{labels:ps.top.map(x=>x.p),datasets:[{label:"کلیک",data:ps.top.map(x=>x.clk),backgroundColor:ps.top.map((_,i)=>alpha(ac,Math.max(.3,.9-i*.06))),borderRadius:8,barThickness:"flex",maxBarThickness:24}]},
+    options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{...tooltipBase(),callbacks:{label:x=>{ const k=ps.top[x.dataIndex]; return [` کلیک: ${fa(k.clk)}`,` نمایش: ${fa(k.imp)}`,...(k.imp?[` CTR: ${faPct(k.clk/k.imp)}`]:[]),` هزینه: ${compact(k.cost)}`]; }}}},
+      scales:{x:spScale(v=>fa(v)),y:{grid:{display:false},border:{display:false},ticks:{autoSkip:false,font:{size:11.5}}}}}});
+  const pubCard=ps&&ps.top.length>=3?spCard(`<h2>پابلیشرهای برتر</h2><p class="sub">بیشترین کلیک از میان ${fa(ps.n)} سایت و اپلیکیشن</p><div class="sp-chart" style="height:${ps.top.length*34+40}px"><canvas id="spOvPub"></canvas></div>`
+      +(ps.ctr.length?`<div class="sp-split"><div><h3>بالاترین نرخ کلیک</h3>${ps.ctr.map(x=>`<div class="row"><span>${esc(x.p)}</span><b>${faPct(x.ctr)}</b></div>`).join("")}</div></div>`:""),"","spOvPub",.05):"";
   const body=REPORT&&REPORT.narr?cleanHtml(REPORT.narr):(()=>{ const sv=savedReport(); return sv?cleanHtml(sv.html):draftReport(info,recs,prevRecs,hasPrev,from,to); })();
   return `<div class="sp-stats">${tiles}</div>`
     +spCard(`<h2>روند روزانه</h2><p class="sub">هزینه هر روز${cpas.length?" و "+cpas.map(spLabel).join(" و "):""}</p><div class="sp-chart lg"><canvas id="spOvDaily"></canvas></div>`,"","spOvDaily")
-    +(split?spCard(`<h2>${split.map(g=>esc(g.name)).join(" و ")}</h2><p class="sub">نوار زیر هر عدد سهم آن از کل است</p>${splitCard}`,"","",.05):"")
+    +(split?spCard(`<h2>${split.length>2?"به تفکیک نوع تبلیغ":split.map(g=>esc(g.name)).join(" و ")}</h2><p class="sub">نوار زیر هر عدد سهم آن از کل است</p>${splitCard}`,"","",.05):"")
+    +pubCard
     +`<div class="sp-grid">`+(camps.length>1?spCard(`<h2>کمپین‌های برتر</h2><p class="sub">${esc(spLabel(r0))} به تفکیک کمپین</p><div class="sp-chart" style="height:${Math.max(200,camps.length*38+40)}px"><canvas id="spOvCamp"></canvas></div>`,"","spOvCamp",.05):"")
     +spCard(`<div class="sp-text">${body}</div>`,"","",.1)+`</div>`;
 }
@@ -1822,6 +1840,16 @@ function spIndustry(c){
 /* marker comments built from pieces, so no slash-star or double slash appears inside strings or regexes */
 const CMT = n => "/"+"*"+n+"*"+"/";
 const MARK = n => new RegExp("\\/\\*"+n+"\\*\\/[\\s\\S]*?\\/\\*END\\*\\/");
+/* per-publisher totals for the report: top by clicks, and top by CTR among publishers with real reach. "سایر" (Yektanet's other) is not a publisher */
+function pubSummary(from,to){ if(REPORT&&REPORT.pubs) return REPORT.pubs;
+  const ps=(DB.pubs||[]).filter(p=>p.client===S.client&&p.date>=from&&p.date<=to); if(!ps.length) return null;
+  const m=new Map(); ps.forEach(p=>{ const k=String(p.publisher).trim(); if(!k||k==="سایر") return; const o=m.get(k)||m.set(k,{p:k,cost:0,clk:0,imp:0}).get(k);
+    o.cost+=p.m.cost||0; o.clk+=p.m.clicks||0; o.imp+=p.m.impressions||0; });
+  const all=[...m.values()].filter(o=>o.imp>0||o.clk>0); if(!all.length) return null;
+  const imp=all.reduce((s,o)=>s+o.imp,0), min=Math.max(5000,imp*0.002);
+  const top=[...all].sort((x,y)=>y.clk-x.clk).slice(0,10);
+  const ctr=all.filter(o=>o.imp>=min).map(o=>({...o,ctr:o.clk/o.imp})).sort((x,y)=>y.ctr-x.ctr).slice(0,5);
+  return {n:all.length,top,ctr}; }
 function pubsSnap(){ const ps=(DB.pubs||[]).filter(p=>p.client===S.client&&p.date>=S.from&&p.date<=S.to); if(!ps.length) return null;
   const ms=[...new Set(ps.flatMap(p=>Object.keys(p.m)))], h=["date","client","source","publisher","campaign",...ms];
   return [h,...ps.map(p=>[p.date,p.client,p.source,p.publisher,p.campaign,...ms.map(m=>p.m[m]||"")])]; }
@@ -1891,7 +1919,8 @@ const LINK_ID=(location.hash.match(/^#r=([A-Za-z0-9]{8,32})$/)||[])[1]||null;
 function reportSpec(mode){
   const body=document.getElementById("repBody"), sv=savedReport();
   const narr=REP.key===repKey()&&body.innerHTML.trim()?cleanHtml(body.innerHTML):(sv?cleanHtml(sv.html):null);
-  return {made:new Date().toISOString().slice(0,10),state:Object.assign({},S,{preset:-1}),narr,mode};
+  const pubs=mode==="special"?pubSummary(S.from,S.to):null;   /* the special file has no publisher rows, only this summary */
+  return Object.assign({made:new Date().toISOString().slice(0,10),state:Object.assign({},S,{preset:-1}),narr,mode},pubs?{pubs}:{});
 }
 async function openLink(){
   try{
