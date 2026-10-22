@@ -766,7 +766,13 @@ async function boot(){
   if(REPORT) return;
   if(await startConnector()) return;
   if(GAS){ await reloadSheet(); setInterval(reloadSheet,300000); return; }
-  try{ DB=await loadCSV(); statusNote=""; setStatus(); render(); }catch(e){}
+  /* the publishers tab is the biggest, so the dashboard draws as soon as data and clients arrive and adds publishers after */
+  const loading=!DB.rows.length; if(loading){ statusNote="در حال دریافت داده از شیت…"; setStatus(); render(); }
+  try{ const pp=fetchSheet("publishers").catch(()=>null);
+    const [d,c,r]=await Promise.all([fetchSheet("data"),fetchSheet("clients"),fetchSheet("reports").catch(()=>null)]);
+    DB=fromTable(d,c,null,r,null); statusNote=""; setStatus(); render();
+    const p=await pp; if(p){ DB.pubs=pubsFrom(p); render(); } }
+  catch(e){ statusNote="شیت در دسترس نبود؛ صفحه را دوباره باز کنید"+(DB.rows.length?" · نسخه ذخیره‌شده":""); setStatus(); render(); }
 }
 
 /* ---------- model: blend ad-network cost with tracker installs/events by campaign ---------- */
@@ -975,7 +981,7 @@ function render(){
   const clients=[...new Set(DB.rows.map(r=>r.client))];
   if(!clients.includes(S.client)) S.client=clients[0]||null;
   renderClientTabs(clients);
-  if(!S.client){document.getElementById("kpis").innerHTML='<div class="empty">هنوز داده‌ای در شیت نیست.</div>';return;}
+  if(!S.client){document.getElementById("kpis").innerHTML=`<div class="empty">${statusNote?esc(statusNote):"هنوز داده‌ای در شیت نیست."}</div>`;return;}
   let info=clientInfo(); TARGETS=Object.assign(parseTargets(info.cpa_targets),REPORT?{}:store.get("targets:"+S.client,{})); setAliases(info.campaign_aliases); setGroups(info.campaign_groups); let rowsAll=clientRows();
   /* days that have results (tracker rows, or conversions the ad network itself reports, e.g. Yektanet tag events) */
   TRACK_DATES=new Set(rowsAll.filter(r=>isTracker(r.source)||!CORE.includes(r.metric)).map(r=>r.date));
