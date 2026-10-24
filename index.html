@@ -2001,7 +2001,7 @@ function spDeep(c,a,recs,split,cur,ac,days,byDay){
   if(gs.length>1&&tc){ SP.draw.spShare=()=>spChart("spShare",{type:"doughnut",data:{labels:names,datasets:[{data:gs.map(g=>g.a.s.cost||0),backgroundColor:gs.map((_,i)=>colr(i)),borderColor:cssVar("--surface"),borderWidth:3,hoverOffset:14}]},
       options:{cutout:"62%",plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8,font:{size:11.5}}},tooltip:{...tooltipBase(),callbacks:{label:x=>` ${x.label}: ${compact(x.parsed)} (${faPct(x.parsed/tc)})`}}}}});
     cards.push(spCard(`<h2>سهم هر نوع از هزینه</h2><p class="sub">روی هر بخش بروید تا مبلغ و سهم آن را ببینید</p><div class="sp-chart"><canvas id="spShare"></canvas></div>`,"","spShare",.05)); }
-  if(gs.some(g=>(g.a.s.clicks||0)>0)){ SP.draw.spClk=()=>spChart("spClk",{data:{labels:names.map(short),datasets:[
+  if(gs.filter(g=>(g.a.s.clicks||0)>0).length>1){ SP.draw.spClk=()=>spChart("spClk",{data:{labels:names.map(short),datasets:[
       {type:"bar",label:"کلیک",data:gs.map(g=>g.a.s.clicks||0),backgroundColor:alpha(ac,.8),borderRadius:8,maxBarThickness:34,yAxisID:"y",order:2},
       {type:"line",label:"CTR",data:gs.map(g=>spValid(g.a,"ctr")),borderColor:colr(1),backgroundColor:colr(1),borderWidth:2.5,pointRadius:5,pointHoverRadius:8,tension:.3,yAxisID:"y2",order:1}]},
       options:{interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{title:x=>names[x[0].dataIndex],label:x=>` ${x.dataset.label}: ${x.dataset.yAxisID==="y2"?faPct(x.parsed.y):fa(x.parsed.y)}`}}},
@@ -2039,9 +2039,8 @@ function spDeep(c,a,recs,split,cur,ac,days,byDay){
   if(r0&&(a.s[r0]||0)>0){ const cp=spVal(a,cpa0), withR=gs.filter(g=>spValid(g.a,cpa0)!=null), best=[...withR].sort((x,y)=>spVal(x.a,cpa0)-spVal(y.a,cpa0)), noR=gs.filter(g=>(g.a.s.cost||0)>0&&!(g.a.s[r0]||0));
     const half=Math.floor(days.length/2), cpaOf=ds=>{ const rr=ds.flatMap(d=>byDay[d]||[]); return rr.length?spVal(aggregate(rr),cpa0):null; }, h1=cpaOf(days.slice(0,half)), h2=cpaOf(days.slice(half));
     const kv=[[`${spLabel(cpa0)} کل بازه`,cp!=null?fa(Math.round(cp))+" "+cur:"–",`${fa(a.s[r0])} ${esc(spLabel(r0))}`],
-      ...(best.length?[[RS.length>1?`به‌صرفه‌ترین نوع برای ${esc(spLabel(r0))}`:"به‌صرفه‌ترین نوع",esc(best[0].name),fa(Math.round(spVal(best[0].a,cpa0)))+" "+cur+" برای هر مورد"]]:[]),
-      ...(campList.filter(g=>spValid(g.a,cpa0)!=null).length>1?(()=>{ const bc=campList.filter(g=>spValid(g.a,cpa0)!=null).sort((x,y)=>spVal(x.a,cpa0)-spVal(y.a,cpa0))[0]; return [["به‌صرفه‌ترین کمپین",esc(bc.name),fa(Math.round(spVal(bc.a,cpa0)))+" "+cur+" برای هر مورد"]]; })():[]),
-      ...(h1&&h2&&h2<h1*0.97?[["نیمه دوم بازه در برابر نیمه اول","▼ "+pctTxt(h2/h1-1),"هزینه هر نتیجه کاهش یافت"]]:[])];
+
+      ];   /* no "most cost-efficient type" or half-vs-half cards (Arya 2026-10-24: unnecessary) */
     SP.draw.spCpaD=()=>spChart("spCpaD",{data:{labels:days.map(jShort),datasets:[
         {type:"bar",label:spLabel(r0),data:days.map(d=>byDay[d]?aggregate(byDay[d]).s[r0]||0:null),backgroundColor:alpha(ac,.35),borderRadius:6,yAxisID:"y",order:2},
         {type:"line",label:spLabel(cpa0),data:days.map(d=>byDay[d]?spValid(aggregate(byDay[d]),cpa0):null),borderColor:colr(2),backgroundColor:colr(2),borderWidth:2.5,tension:.35,pointRadius:3,pointHoverRadius:7,spanGaps:true,yAxisID:"y2",order:1},
@@ -2053,7 +2052,7 @@ function spDeep(c,a,recs,split,cur,ac,days,byDay){
     if(withR1.length>1) SP.draw.spCpaT1=()=>spChart("spCpaT1",hBar("spCpaT1",cpa1,spLabel(cpa1),false));
     if(r1&&(a.s[r1]||0)>0){ const c1=spVal(a,cpa1), b1=[...withR1].sort((x,y)=>spVal(x.a,cpa1)-spVal(y.a,cpa1));
       kv.splice(1,0,[`${spLabel(cpa1)} کل بازه`,c1!=null?fa(Math.round(c1))+" "+cur:"–",`${fa(a.s[r1])} ${esc(spLabel(r1))}`]);
-      if(b1.length) kv.push([`به‌صرفه‌ترین نوع برای ${esc(spLabel(r1))}`,esc(b1[0].name),fa(Math.round(spVal(b1[0].a,cpa1)))+" "+cur+" برای هر مورد"]); }
+    }
     const cpaT1=withR1.length>1?`<h3 style="margin:18px 0 8px;font-size:15px">${esc(spLabel(cpa1))} به تفکیک نوع</h3><div class="sp-chart" style="height:${Math.max(180,withR1.length*36+50)}px"><canvas id="spCpaT1"></canvas></div>`:"";
     out.cpa=spCard(`<h2>گزارش هزینه هر نتیجه (CPA)</h2><p class="sub">${esc(spLabel(r0))} و ${esc(spLabel(cpa0))} روز به روز و به تفکیک نوع</p><div class="sp-kv">${kv.map(([k,v,n])=>`<div><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("")}</div>
       <div class="sp-chart"><canvas id="spCpaD"></canvas></div>`
