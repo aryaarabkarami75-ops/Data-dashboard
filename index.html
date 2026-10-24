@@ -1871,7 +1871,7 @@ function spCampaignReport(c){
   const notes=(L.notes||[]).filter(n=>n.when.every(act));
   const noteCard=notes.length?spCard(`<h2>نکته</h2><div class="sp-text"><ul>${notes.map(n=>`<li>${n.text}</li>`).join("")}</ul></div>`,"","",.05):"";
   const foot=`<p class="sub" style="text-align:center;margin:4px 0 0"><b>منبع داده:</b> گزارش کمپین‌های پنل یکتانت، ${jLong(from)} تا ${jLong(to)}.${idle?` ${fa(idle)} کمپین بدون هزینه در این بازه در جدول گنجانده نشده‌اند.`:""}</p>`;
-  return `<div class="sp-stats">${tiles}</div>`+trend+table+shares+rank+summary+noteCard+foot;
+  return `<div class="sp-stats">${tiles}</div>`+trend+table+shares+rank+summary+noteCard;   /* no data-source footnote (Arya 2026-10-24) */
 }
 
 /* tab 1: the client report, with the same numbers and text, laid out as cards */
