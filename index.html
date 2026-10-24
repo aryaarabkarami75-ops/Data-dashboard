@@ -569,7 +569,12 @@ const LABELS = {
    so both periods compare on one line; charts of it mark the switch (Arya 2026-10-13: Gvest moved from tag "actions" to "sign_up" on 18 Mehr) */
 const METRIC_SWITCH = { Gvest:{key:"conv", from:"actions", to:"sign_up", at:"2026-10-10"} };
 /* clients whose reports show channel sections instead of one line per campaign (Arya 2026-10-17: Daric = Cafe Bazaar and app ads) */
-const REPORT_SPLIT = { Daric:[{name:"کافه‌بازار",has:ch=>ch==="yektanet-cafe"},{name:"تبلیغات اپ",has:()=>true}],
+/* GsmPay campaign types from the Yektanet panel's «نوع» column, by campaign name (Arya 2026-10-24: charts per campaign type) */
+const GSMPAY_TYPE_NAMES=["پویا", "درون‌اپلیکیشنی", "پیامکی", "همسان", "پوش", "ویدئویی", "بنری"], GSMPAY_TYPES={"i-cpa-loan200":1,"p-kw-ecpc":0,"p-cntx-ecpc":0,"video-ret":5,"push":4,"pouya-kw-tcpa":0,"pouya-b-tcpa":0,"app-w-regex":1,"pouya-ret-all":0,"pouya-ret-notreq":0,"pouya-ret-fromgsm":0,"p-cntx-tcpa":0,"sms0407":2,"bd-kw-loan200":0,"shaypour-banner-d":1,"sms-rtg-loan200":2,"inapp-bale-signup":1,"sms-bazarmali":2,"i-cpc-loan200":1,"push-cpm-loan200":4,"sms-loan200-new":2,"sms-daneshjoo":2,"sp-cpm-loan200":1,"sms-loan200":2,"app-igap":1,"sms-0107":2,"sms-2506":2,"sms-loan200-digital":2,"bale-loan":1,"i-cpa-loan200-seg":1,"sms-loan200-ghesti":2,"push-tn-cpc-loan200":4,"pouya-contextual2-gp":0,"mehr404":3,"shaypour-native":1,"ssss":1,"inapp-cpa-pass":1,"pin-bale50":1,"Bnr_140308_0day":6,"rubika-cpc":0,"video-cntx":5,"pouya-rubika-bulk2":0,"pouya-rubika-bulk":0,"pouya-bulk-gp":0,"rubika-pin":0,"تا ۱۰۰ میلیون وام بگیر!":1,"Native_signupb_f2":3,"Pouya-Tcpa":0,"signupb":6,"shaypour-b-mobile":1,"banner-sport-cacquisition-aban404":6,"Native_140306_All":3,"inapp-regex":1,"banner-mobile-cacquisition-aban404":6,"banner-finance-cacquisition-aban404":6,"banner-music-cacquisition-aban404":6,"inapp-cpa-button":1,"inapp-cpa-tashilat":1,"divar-category-city":1,"divar-category-keyword":1,"pouya-rubika":0,"divar-category":1,"push-new":4,"push-all":4,"pouya-retarget":0,"pouya-keyword-gp":0,"pouya-contextual1-gp":0,"zarebin-native":0,"inapp-cpa-otp":1,"pouya-cntx-tcpa":0,"fix-khabaronline":0,"100 میلیون وام بگیر!":1,"app-26680":1,"rubika-tile-1bahman":3,"tile-rubika-6bahman":3,"Native_140307_Just_Night":3,"Native_signupb_f1":3,"tile-rubika-6bahma":3,"Native_407_CAcq_Super_Limited":3,"User-Acq-140306-001":3,"Seller-Acq-140306-001":3,"Native-Cacquisition-mehr404-7to9":3,"Retarget-Cacquisition-140409":3,"Native-Cacquisition-mehr404-22to0":3,"Native-mehr404":3,"Native-mehr404-7-9":3,"Native-Cacquisition-mehr404-16to19":3,"Native_140306_PCACQT1":3,"Native_140306_IPPACQT1":3,"Native_140306_UACQT3":3,"Native-Cacquisition-mehr404-12to14":3,"Native-Cacquisition-meh404-2-12to14":3,"Native_140306_UACQT2":3,"Native_140306_UACQT1":3,"Native_140306_PCACQT2":3,"Native_140307_Special":3,"Native_140306_IPPACQT2":3,"Native-Cacquisition-finance":3,"AWRNS-140306-001":3,"Retarget-Cacquisition":3,"Native-Cacquisition-sport":3,"Rubika-pin-cpv":3};
+let GSMT=null; const gsmType=ck=>{ if(!GSMT) GSMT=new Map(Object.entries(GSMPAY_TYPES).map(([n,i])=>[ckey(n),i])); return GSMT.get(ck); };
+const REPORT_SPLIT = {
+  GsmPay:[...GSMPAY_TYPE_NAMES.map((n,i)=>({name:n,has:(ch,r)=>gsmType(r.ck)===i})),{name:"سایر",has:()=>true}],
+   Daric:[{name:"کافه‌بازار",has:ch=>ch==="yektanet-cafe"},{name:"تبلیغات اپ",has:()=>true}],
   /* Extreme Walls: one section per Yektanet ad type, from the campaign name prefix or the type name of the full-report rows (Arya 2026-10-20) */
   ExtremeWalls:[{name:"ویدیویی",has:(ch,r)=>/^v-|ویدیو/.test(r.campaign)},{name:"پویا",has:(ch,r)=>/^p-|پویا/.test(r.campaign)},
     {name:"درون‌اپلیکیشنی",has:(ch,r)=>/^app-|surush|درون/.test(r.campaign)},{name:"نشان",has:(ch,r)=>/neshan|نشان/.test(r.campaign)},
@@ -586,8 +591,11 @@ const SP_LAYOUT = { Sepehrino:{goal:"sign_up",
   notes:[{when:["کلیکی وب|پابلیشرهای برتر وب","TCPA"],text:"کمپین‌های <b>کلیکی وب</b> و <b>پابلیشرهای برتر وب</b> پیش‌زمینه‌ای برای کمپین <b>TCPA</b> هستند و باعث افزایش learning این کمپین می‌شوند."},
          {when:["سروش پلاس","بله"],text:"کمپین‌های <b>سروش پلاس</b> و <b>بله</b> با توجه به پیش‌فرض بالا بودن کیفیت یوزرها، علی‌رغم بالا بودن هزینه ثبت‌نام حفظ شده‌اند."}]} };
 /* numbers a client's special report leaves out (Arya 2026-10-24: Sepehrino without cost per click, per impression or per session) */
-const SP_HIDE = { Sepehrino:/^(cpc|cpm|cpa:sessions)$/ };
-const spShown = m => !(SP_HIDE[S.client]&&SP_HIDE[S.client].test(m));
+/* Arya 2026-10-24: no cost per click, per impression or per session for any client unless asked; a client entry here replaces this default */
+const SP_HIDE_ALL = /^(cpc|cpm|cpa:sessions)$/, SP_HIDE = {};
+const spShown = m => !(SP_HIDE[S.client]||SP_HIDE_ALL).test(m);
+/* clients whose special report shows campaign types only, no per-campaign tables or charts (Arya 2026-10-24: GsmPay) */
+const SP_TYPES_ONLY = { GsmPay:true };
 /* a ratio is shown only on enough data and when it is plausible (Arya 2026-10-24: a push STC of 600% is not shown) */
 function spValid(a,m){ const s=a.s, v=spVal(a,m); if(v==null||!isFinite(v)) return null;
   if(m==="ctr") return (s.impressions||0)>=10000?v:null;
@@ -1942,10 +1950,11 @@ function spGroupsOf(recs,split){
 function spDeep(c,a,recs,split,cur,ac,days,byDay){
   const out={trend:"",table:"",charts:"",cpa:""};
   const evs=S.events.filter(e=>(a.s[e]||0)>0&&e!=="sessions"), r0=(a.s.installs||0)>0?"installs":evs[0]||null, cpa0=r0?"cpa:"+r0:null;
+  const RS=r0?[r0,...((a.s.installs||0)>0?[]:evs.slice(1,2))]:[];   /* GsmPay: sign-ups and loan requests both (Arya 2026-10-24) */
   const pal=["--s1","--s2","--s3","--s4","--s5","--s6","--s7"].map(cssVar).filter(Boolean); const colr=i=>i===0?ac:pal[(i-1)%pal.length]||ac;
   const has=m=>spShown(m)&&spValid(a,m)!=null&&(spVal(a,m)>0);
   /* 1. one daily chart, any metric */
-  const TM=["cost","impressions","clicks","ctr","cpc","sessions","stc",...(r0?[r0,cpa0]:[])].filter(has);
+  const TM=["cost","impressions","clicks","ctr","cpc","sessions","stc",...RS.flatMap(r=>[r,"cpa:"+r])].filter(has);
   SP.trendM=SP.trendM&&TM.includes(SP.trendM)?SP.trendM:"clicks";
   SP.drawTrend=()=>{ const m=SP.trendM, pct=spKind(m)==="p";
     spChart("spTrend",{type:"line",data:{labels:days.map(jShort),datasets:[{label:spLabel(m),data:days.map(d=>byDay[d]?spVal(aggregate(byDay[d]),m):null),borderColor:ac,backgroundColor:spGrad(ac,.02,.28),fill:true,borderWidth:2.5,tension:.35,pointRadius:3,pointHoverRadius:7,spanGaps:true}]},
@@ -1957,7 +1966,7 @@ function spDeep(c,a,recs,split,cur,ac,days,byDay){
   const gs=spGroupsOf(recs,split).filter(g=>(g.a.s.cost||0)>0); if(!gs.length) return out;
   const tc=a.s.cost||0;
   const tableFor=(id,list,title,firstCol,typeOf)=>{
-    const cols=[["cost","هزینه"],["share","سهم هزینه"],["impressions","نمایش"],["clicks","کلیک"],["ctr","CTR"],["cpc","CPC"],["cpm","CPM"],["sessions","سشن"],["stc","STC"],...(r0?[[r0,spLabel(r0)],[cpa0,"هزینه هر "+(r0==="installs"?"نصب":evName(r0))]]:[])]
+    const cols=[["cost","هزینه"],["share","سهم هزینه"],["impressions","نمایش"],["clicks","کلیک"],["ctr","CTR"],["cpc","CPC"],["cpm","CPM"],["sessions","سشن"],["stc","STC"],...RS.flatMap(r=>[[r,spLabel(r)],["cpa:"+r,"هزینه هر "+(r==="installs"?"نصب":evName(r))]])]
       .filter(([m])=>spShown(m)&&(m==="share"||list.some(g=>spValid(g.a,m)!=null&&spVal(g.a,m)>0)));
     const cell=(g,m)=>m==="share"?(tc?(g.a.s.cost||0)/tc:null):spValid(g.a,m);
     const fmtC=(m,v)=>v==null||!isFinite(v)?"–":m==="share"||spKind(m)==="p"?faPct(v):fa(Math.round(v));
@@ -1969,7 +1978,7 @@ function spDeep(c,a,recs,split,cur,ac,days,byDay){
   out.table=tableFor("t1",gs,`عملکرد به تفکیک ${split?"نوع کمپین":"کمپین"}`,split?"نوع کمپین":"کمپین");
   /* per campaign as well, beside the types (Arya 2026-10-24) */
   let campList=[];
-  if(split){ const per=new Map(); recs.forEach(r=>{(per.get(r.ck)||per.set(r.ck,{name:r.campaign,recs:[]}).get(r.ck)).recs.push(r);});
+  if(split&&!SP_TYPES_ONLY[S.client]){ const per=new Map(); recs.forEach(r=>{(per.get(r.ck)||per.set(r.ck,{name:r.campaign,recs:[]}).get(r.ck)).recs.push(r);});
     campList=[...per.values()].map(p=>({name:p.name,recs:p.recs,a:aggregate(p.recs)})).filter(g=>(g.a.s.cost||0)>0).sort((x,y)=>(y.a.s.cost||0)-(x.a.s.cost||0));
     const typeOf=g=>{ const t=split.find(sg=>sg.recs.includes(g.recs[0])); return t?t.name:""; };
     if(campList.length>1) out.table+=tableFor("t2",campList,"عملکرد به تفکیک کمپین","کمپین",typeOf); }
@@ -1989,8 +1998,9 @@ function spDeep(c,a,recs,split,cur,ac,days,byDay){
     cards.push(spCard(`<h2>کلیک و نرخ کلیک</h2><p class="sub">ستون‌ها کلیک و خط CTR هر نوع</p><div class="sp-chart"><canvas id="spClk"></canvas></div>`,"","spClk",.05)); }
   if(gs.filter(g=>spValid(g.a,"stc")!=null).length>1){ SP.draw.spStc=()=>spChart("spStc",hBar("spStc","stc","STC",true));
     cards.push(spCard(`<h2>نرخ ورود به سایت (STC)</h2><p class="sub">سهم کلیک‌هایی که به سشن در سایت رسیدند</p><div class="sp-chart" style="height:${H}px"><canvas id="spStc"></canvas></div>`,"","spStc",.05)); }
-  if(r0&&gs.some(g=>(g.a.s[r0]||0)>0)){ SP.draw.spRes=()=>spChart("spRes",hBar("spRes",r0,spLabel(r0),false));
-    cards.push(spCard(`<h2>${esc(spLabel(r0))} به تفکیک نوع</h2><p class="sub">تعداد نتیجه هر نوع کمپین</p><div class="sp-chart" style="height:${H}px"><canvas id="spRes"></canvas></div>`,"","spRes",.05)); }
+  RS.forEach((r,k)=>{ if(!gs.some(g=>(g.a.s[r]||0)>0)) return; const id="spRes"+(k||"");
+    SP.draw[id]=()=>spChart(id,hBar(id,r,spLabel(r),false));
+    cards.push(spCard(`<h2>${esc(spLabel(r))} به تفکیک نوع</h2><p class="sub">تعداد نتیجه هر نوع کمپین</p><div class="sp-chart" style="height:${H}px"><canvas id="${id}"></canvas></div>`,"",id,.05)); });
   const cl=campList.filter(g=>(g.a.s[r0]||0)>0).sort((x,y)=>(y.a.s[r0]||0)-(x.a.s[r0]||0)).slice(0,10);
   if(r0&&cl.length>1){ SP.draw.spResC=()=>spChart("spResC",hBar("spResC",r0,spLabel(r0),false,cl));
     cards.push(spCard(`<h2>${esc(spLabel(r0))} به تفکیک کمپین</h2><p class="sub">کمپین‌هایی که بیشترین نتیجه را آوردند</p><div class="sp-chart" style="height:${Math.max(200,cl.length*36+50)}px"><canvas id="spResC"></canvas></div>`,"","spResC",.05)); }
@@ -2004,7 +2014,7 @@ function spDeep(c,a,recs,split,cur,ac,days,byDay){
   if(r0&&(a.s[r0]||0)>0){ const cp=spVal(a,cpa0), withR=gs.filter(g=>spValid(g.a,cpa0)!=null), best=[...withR].sort((x,y)=>spVal(x.a,cpa0)-spVal(y.a,cpa0)), noR=gs.filter(g=>(g.a.s.cost||0)>0&&!(g.a.s[r0]||0));
     const half=Math.floor(days.length/2), cpaOf=ds=>{ const rr=ds.flatMap(d=>byDay[d]||[]); return rr.length?spVal(aggregate(rr),cpa0):null; }, h1=cpaOf(days.slice(0,half)), h2=cpaOf(days.slice(half));
     const kv=[[`${spLabel(cpa0)} کل بازه`,cp!=null?fa(Math.round(cp))+" "+cur:"–",`${fa(a.s[r0])} ${esc(spLabel(r0))}`],
-      ...(best.length?[["به‌صرفه‌ترین نوع",esc(best[0].name),fa(Math.round(spVal(best[0].a,cpa0)))+" "+cur+" برای هر مورد"]]:[]),
+      ...(best.length?[[RS.length>1?`به‌صرفه‌ترین نوع برای ${esc(spLabel(r0))}`:"به‌صرفه‌ترین نوع",esc(best[0].name),fa(Math.round(spVal(best[0].a,cpa0)))+" "+cur+" برای هر مورد"]]:[]),
       ...(campList.filter(g=>spValid(g.a,cpa0)!=null).length>1?(()=>{ const bc=campList.filter(g=>spValid(g.a,cpa0)!=null).sort((x,y)=>spVal(x.a,cpa0)-spVal(y.a,cpa0))[0]; return [["به‌صرفه‌ترین کمپین",esc(bc.name),fa(Math.round(spVal(bc.a,cpa0)))+" "+cur+" برای هر مورد"]]; })():[]),
       ...(h1&&h2&&h2<h1*0.97?[["نیمه دوم بازه در برابر نیمه اول","▼ "+pctTxt(h2/h1-1),"هزینه هر نتیجه کاهش یافت"]]:[])];
     SP.draw.spCpaD=()=>spChart("spCpaD",{data:{labels:days.map(jShort),datasets:[
@@ -2014,10 +2024,16 @@ function spDeep(c,a,recs,split,cur,ac,days,byDay){
       options:{interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",rtl:true,labels:{usePointStyle:true,boxWidth:8,boxHeight:8}},tooltip:{...tooltipBase(),callbacks:{label:x=>` ${x.dataset.label}: ${fa(Math.round(x.parsed.y))}`}}},
         scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:12}},y:spScale(v=>fa(v),{title:{display:true,text:spLabel(r0)}}),y2:spScale(null,{position:"right",grid:{display:false},title:{display:true,text:spLabel(cpa0)}})}}});
     if(withR.length>1) SP.draw.spCpaT=()=>spChart("spCpaT",hBar("spCpaT",cpa0,spLabel(cpa0),false));
+    const r1=RS[1], cpa1=r1?"cpa:"+r1:null, withR1=r1?gs.filter(g=>spValid(g.a,cpa1)!=null):[];
+    if(withR1.length>1) SP.draw.spCpaT1=()=>spChart("spCpaT1",hBar("spCpaT1",cpa1,spLabel(cpa1),false));
+    if(r1&&(a.s[r1]||0)>0){ const c1=spVal(a,cpa1), b1=[...withR1].sort((x,y)=>spVal(x.a,cpa1)-spVal(y.a,cpa1));
+      kv.splice(1,0,[`${spLabel(cpa1)} کل بازه`,c1!=null?fa(Math.round(c1))+" "+cur:"–",`${fa(a.s[r1])} ${esc(spLabel(r1))}`]);
+      if(b1.length) kv.push([`به‌صرفه‌ترین نوع برای ${esc(spLabel(r1))}`,esc(b1[0].name),fa(Math.round(spVal(b1[0].a,cpa1)))+" "+cur+" برای هر مورد"]); }
+    const cpaT1=withR1.length>1?`<h3 style="margin:18px 0 8px;font-size:15px">${esc(spLabel(cpa1))} به تفکیک نوع</h3><div class="sp-chart" style="height:${Math.max(180,withR1.length*36+50)}px"><canvas id="spCpaT1"></canvas></div>`:"";
     out.cpa=spCard(`<h2>گزارش هزینه هر نتیجه (CPA)</h2><p class="sub">${esc(spLabel(r0))} و ${esc(spLabel(cpa0))} روز به روز و به تفکیک نوع</p><div class="sp-kv">${kv.map(([k,v,n])=>`<div><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("")}</div>
       <div class="sp-chart"><canvas id="spCpaD"></canvas></div>`
       +(withR.length>1?`<h3 style="margin:18px 0 8px;font-size:15px">${esc(spLabel(cpa0))} به تفکیک نوع</h3><div class="sp-chart" style="height:${Math.max(180,withR.length*36+50)}px"><canvas id="spCpaT"></canvas></div>`:"")
-      ,"",["spCpaD",withR.length>1?"spCpaT":""].filter(Boolean).join(","),.05);
+      +cpaT1,"",["spCpaD",withR.length>1?"spCpaT":"",cpaT1?"spCpaT1":""].filter(Boolean).join(","),.05);
     /* draw only the chart that exists */
     if(withR.length<=1) delete SP.draw.spCpaT; }
   return out; }
