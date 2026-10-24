@@ -580,6 +580,8 @@ const REPORT_SPLIT = { Daric:[{name:"کافه‌بازار",has:ch=>ch==="yektan
   Sepehrino:[{name:"پیامک تبلیغاتی",has:(ch,r)=>/پیامک|پیام شخصی/.test(r.campaign)},{name:"درون‌اپلیکیشنی (نمایشی)",has:(ch,r)=>/بله|سروش|نشان|درون/.test(r.campaign)},
     {name:"پویا (عادی)",has:(ch,r)=>/وب|TCPA|پویا/.test(r.campaign)},{name:"همسان",has:(ch,r)=>/همسان/.test(r.campaign)},{name:"پوش کلیکی",has:(ch,r)=>/پوش/.test(r.campaign)},{name:"سایر",has:()=>true}] };
 /* clients whose special report follows the campaign-table layout of Arya's sample (Sepehrino, 2026-10-24) */
+/* clients whose special report stays in the short layout: tiles, daily chart, channel sections, text (Arya 2026-10-24 for Daric) */
+const SP_SIMPLE = {Daric:true};
 const SP_LAYOUT = { Sepehrino:{goal:"sign_up",
   notes:[{when:["کلیکی وب|پابلیشرهای برتر وب","TCPA"],text:"کمپین‌های <b>کلیکی وب</b> و <b>پابلیشرهای برتر وب</b> پیش‌زمینه‌ای برای کمپین <b>TCPA</b> هستند و باعث افزایش learning این کمپین می‌شوند."},
          {when:["سروش پلاس","بله"],text:"کمپین‌های <b>سروش پلاس</b> و <b>بله</b> با توجه به پیش‌فرض بالا بودن کیفیت یوزرها، علی‌رغم بالا بودن هزینه ثبت‌نام حفظ شده‌اند."}]} };
@@ -1880,7 +1882,7 @@ function spOverview(c){
   S.events.slice(0,2).forEach(e=>{ if((a.s[e]||0)>0){ stats.push(e); if(M.includes("cpa:"+e)) stats.push("cpa:"+e); } });
   if(ctrFocus||stats.length<=1) ["clicks","ctr","cpc"].forEach(m=>{ if(M.includes(m)&&!stats.includes(m)) stats.push(m); });
   /* the full picture: reach, clicks and site visits next to the results (Arya 2026-10-24: the special report was too thin) */
-  ["impressions","clicks","ctr","cpc","cpm","sessions","stc"].forEach(m=>{ if(!stats.includes(m)&&spValid(a,m)!=null&&spVal(a,m)>0) stats.push(m); });
+  if(!SP_SIMPLE[S.client]) ["impressions","clicks","ctr","cpc","cpm","sessions","stc"].forEach(m=>{ if(!stats.includes(m)&&spValid(a,m)!=null&&spVal(a,m)>0) stats.push(m); });
   for(let i=stats.length-1;i>=0;i--) if(!spShown(stats[i])) stats.splice(i,1);
   const tiles=stats.map((m,i)=>{ const v=spVal(a,m), pv=hasPrev?spVal(b,m):null; let d="";
     if(pv&&v!=null&&m!=="cost"){ const ch=v/pv-1, good=lowerBetter(m)?ch<0:ch>0;
@@ -1919,10 +1921,11 @@ function spOverview(c){
   const shotsCard=shots.length?spCard(`<h2>نمونه نمایش تبلیغات</h2><p class="sub">تبلیغات ${esc(info.display_name||S.client)} در سایت‌ها و اپلیکیشن‌ها</p><div class="sp-shots">${shots.map(x=>`<figure${x.wide?' class="wide"':""}><img src="${x.src}" alt="${esc(x.cap)}" loading="lazy">${x.cap?`<figcaption>${esc(x.cap)}</figcaption>`:""}</figure>`).join("")}</div>`,"","",.05):"";
   const body0=REPORT&&REPORT.narr?cleanHtml(REPORT.narr):(()=>{ const sv=savedReport(); return sv?cleanHtml(sv.html):draftReport(info,recs,prevRecs,hasPrev,from,to); })();
   const body=SPECIAL_PUBS[S.client]?body0:body0.replace(/<h3>پابلیشرهای برتر<\/h3>\s*<p>[\s\S]*?<\/p>/,"");   /* no publishers section in this file (Arya 2026-10-20) */
-  const deep=spDeep(c,a,recs,split,cur,ac,days,byDay);
+  const deep=SP_SIMPLE[S.client]?{trend:"",table:"",charts:"",cpa:""}:spDeep(c,a,recs,split,cur,ac,days,byDay);
+  const simpleSplit=SP_SIMPLE[S.client]&&split?spCard(`<h2>${split.length>2?"به تفکیک نوع تبلیغ":split.map(g=>esc(g.name)).join(" و ")}</h2><p class="sub">نوار زیر هر عدد سهم آن از کل است</p>${splitCard}`,"","",.05):"";
   return `<div class="sp-stats">${tiles}</div>`
     +spCard(`<h2>روند روزانه</h2><p class="sub">هزینه هر روز${cpas.length?" و "+cpas.map(spLabel).join(" و "):""}</p><div class="sp-chart lg"><canvas id="spOvDaily"></canvas></div>`,"","spOvDaily")
-    +deep.trend+deep.table+deep.charts+deep.cpa
+    +simpleSplit+deep.trend+deep.table+deep.charts+deep.cpa
     +shotsCard+pubCard
     +`<div class="sp-grid">`+(camps.length>1?spCard(`<h2>کمپین‌های برتر</h2><p class="sub">${esc(spLabel(r0))} به تفکیک کمپین</p><div class="sp-chart" style="height:${Math.max(200,camps.length*38+40)}px"><canvas id="spOvCamp"></canvas></div>`,"","spOvCamp",.05):"")
     +spCard(`<div class="sp-text">${body}</div>`,"","",.1)+`</div>`;
