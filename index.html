@@ -586,7 +586,7 @@ const REPORT_SPLIT = {
     {name:"پویا (عادی)",has:(ch,r)=>/وب|TCPA|پویا/.test(r.campaign)},{name:"همسان",has:(ch,r)=>/همسان/.test(r.campaign)},{name:"پوش کلیکی",has:(ch,r)=>/پوش/.test(r.campaign)},{name:"سایر",has:()=>true}] };
 /* clients whose special report follows the campaign-table layout of Arya's sample (Sepehrino, 2026-10-24) */
 /* clients whose special report stays in the short layout: tiles, daily chart, channel sections, text (Arya 2026-10-24 for Daric) */
-const SP_SIMPLE = {Daric:true};
+const SP_SIMPLE = {};   /* Daric was here 12:30-13:21 on 2026-10-24; Arya asked for the full report back, by campaign type */
 const SP_LAYOUT = { Sepehrino:{goal:"sign_up",
   notes:[{when:["کلیکی وب|پابلیشرهای برتر وب","TCPA"],text:"کمپین‌های <b>کلیکی وب</b> و <b>پابلیشرهای برتر وب</b> پیش‌زمینه‌ای برای کمپین <b>TCPA</b> هستند و باعث افزایش learning این کمپین می‌شوند."},
          {when:["سروش پلاس","بله"],text:"کمپین‌های <b>سروش پلاس</b> و <b>بله</b> با توجه به پیش‌فرض بالا بودن کیفیت یوزرها، علی‌رغم بالا بودن هزینه ثبت‌نام حفظ شده‌اند."}]} };
@@ -595,7 +595,7 @@ const SP_LAYOUT = { Sepehrino:{goal:"sign_up",
 const SP_HIDE_ALL = /^(cpc|cpm|cpa:sessions)$/, SP_HIDE = {};
 const spShown = m => !(SP_HIDE[S.client]||SP_HIDE_ALL).test(m);
 /* clients whose special report shows campaign types only, no per-campaign tables or charts (Arya 2026-10-24: GsmPay) */
-const SP_TYPES_ONLY = { GsmPay:true };
+const SP_TYPES_ONLY = { GsmPay:true, Daric:true };
 /* a ratio is shown only on enough data and when it is plausible (Arya 2026-10-24: a push STC of 600% is not shown) */
 function spValid(a,m){ const s=a.s, v=spVal(a,m); if(v==null||!isFinite(v)) return null;
   if(m==="ctr") return (s.impressions||0)>=10000?v:null;
