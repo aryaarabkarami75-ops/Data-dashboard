@@ -1449,7 +1449,8 @@ function draftReport(info,recs,prevRecs,hasPrev,from,to){
     H.push("<h3>روند</h3><p>"+t+"</p>");
   }
   /* funnel events */
-  const evs=S.events.filter(e=>(a.s[e]||0)>0);
+  /* every event, largest first, not only the ones picked on the dashboard (Arya 2026-10-24: all events in every report) */
+  const evs=Object.keys(a.s).filter(e=>!NOT_EVENTS.has(e)&&e!=="sessions"&&!e.includes(">")&&(a.s[e]||0)>0).sort((x,y)=>a.s[y]-a.s[x]);
   if(evs.length){
     const li=evs.map(e=>{const c=value(a,"cpa:"+e); return `<li><b>${fa(a.s[e])}</b> ${esc(evName(e))}${c?`، با هزینه <b>${fa(c)} ${cur}</b> برای هر مورد`:""}</li>`;}).join("");
     const sw=evs.map(e=>switchFor(e,from,to)).find(Boolean);
