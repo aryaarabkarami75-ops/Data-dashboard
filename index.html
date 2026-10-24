@@ -588,7 +588,7 @@ function spValid(a,m){ const s=a.s, v=spVal(a,m); if(v==null||!isFinite(v)) retu
   if(m==="stc") return (s.clicks||0)>=300&&v<=1.2?v:null;
   if(m==="cpc") return (s.clicks||0)>=100?v:null;
   if(m==="cpm") return (s.impressions||0)>=10000?v:null;
-  if(m.startsWith("cpa:")) return (s[m.slice(4)]||0)>=5?v:null;
+  if(m.startsWith("cpa:")) return (s[m.slice(4)]||0)>=1?v:null;   /* CPA is factual from one result (Arya 2026-10-24) */
   return v; }
 /* clients whose special report keeps the top publishers (Arya 2026-10-22: Shamana; Extreme Walls has none, 2026-10-20) */
 const SPECIAL_PUBS = { Shamana:true };
