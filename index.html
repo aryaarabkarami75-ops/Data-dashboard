@@ -306,6 +306,16 @@ html:has(body.special){scroll-behavior:smooth}
 .sp-tbl tbody tr:hover{background:var(--accent-wash)}
 .sp-tbl tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:0}
 .sp-tbl .bar{display:inline-block;height:6px;border-radius:3px;background:var(--accent);opacity:.7;vertical-align:middle;margin-inline-start:6px}
+.sp-fun{overflow-x:auto;margin-top:6px;scrollbar-width:thin}
+.sp-fun-in{min-width:calc(var(--n) * 86px);display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));grid-template-rows:auto 120px auto}
+.sp-fun .lab{grid-row:1;text-align:center;padding:0 4px 12px;min-width:0}
+.sp-fun .lab span{display:block;font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.sp-fun .lab b{display:block;font-size:clamp(13px,1.5vw,17px);font-weight:800;letter-spacing:-.01em;white-space:nowrap}
+.sp-fun svg{grid-row:2;grid-column:1/-1;width:100%;height:120px;display:block;filter:drop-shadow(0 8px 18px color-mix(in srgb,var(--accent) 22%,transparent))}
+.sp-fun .sep line{stroke:var(--surface);stroke-width:2;opacity:.55;vector-effect:non-scaling-stroke}
+.sp-fun .pc{grid-row:3;text-align:center;padding-top:12px}
+.sp-fun .pc i{display:inline-block;font-style:normal;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
+.sp-fun .pc i.st{background:none;color:var(--muted);font-weight:600}
 .sp-funnel{display:grid;gap:10px}
 .sp-funnel .st{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center}
 .sp-funnel .st b{display:block;font-size:13px}
@@ -2009,10 +2019,22 @@ function spDeep(c,a,recs,split,cur,ac,days,byDay){
   /* every event goes in the funnel, largest first (Arya 2026-10-24: KYC and the other events further down were missing) */
   const evAll=[...new Set([...(r0?[r0]:[]),...Object.keys(a.s).filter(e=>!NOT_EVENTS.has(e)&&e!=="sessions"&&!e.includes(">"))])].filter(e=>(a.s[e]||0)>0).sort((x,y)=>a.s[y]-a.s[x]);
   const fs=[["impressions","نمایش"],["clicks","کلیک"],["sessions","سشن"],...evAll.map(e=>[e,spLabel(e)])].filter(([m])=>(a.s[m]||0)>0);
-  if(fs.length>=3){ const top=a.s[fs[0][0]];
-    cards.push(spCard(`<h2>قیف تبدیل</h2><p class="sub">از نمایش تا نتیجه، با نرخ هر مرحله</p><div class="sp-funnel">${fs.map(([m,l],i)=>{ const v=a.s[m], w=Math.max(18,Math.pow(v/top,.25)*100);
-      return (i?`<div class="rt">↓ ${faPct(v/a.s[fs[i-1][0]])} از مرحله قبل</div>`:"")+`<div class="st"><div><b>${esc(l)}</b><small>${i?(v/top>=1e-4||!a.s.clicks?faPct(v/top)+" از "+fs[0][1]:faPct(v/a.s.clicks)+" از کلیک"):""}</small></div><div><div class="bx" style="width:${w.toFixed(1)}%">${fa(v)}</div></div></div>`; }).join("")}</div>`,"","",.05)); }
-  out.charts=cards.length?`<div class="sp-grid">${cards.join("")}</div>`:"";
+  /* one wide, smooth funnel band: every step in a row, its volume on a log scale, the step-to-step rate under it (Arya 2026-10-24: the list was too long and plain) */
+  let funnel="";
+  if(fs.length>=3){ const n=fs.length, lv=fs.map(([m])=>Math.log10(a.s[m])), hi=lv[0], lo=Math.min(...lv), H=60;
+    const half=lv.map(v=>hi===lo?H:8+(H-8)*(v-lo)/(hi-lo)), X=i=>1000-(i+.5)*1000/n;
+    const pt=(i,s)=>`${X(i).toFixed(1)},${(H+s*half[i]).toFixed(1)}`, seg=(i,j,s)=>{ const mx=((X(i)+X(j))/2).toFixed(1); return ` C${mx},${(H+s*half[i]).toFixed(1)} ${mx},${(H+s*half[j]).toFixed(1)} ${pt(j,s)}`; };
+    let d=`M1000,${(H-half[0]).toFixed(1)} L${pt(0,-1)}`; for(let i=1;i<n;i++) d+=seg(i-1,i,-1);
+    d+=` L0,${(H-half[n-1]).toFixed(1)} L0,${(H+half[n-1]).toFixed(1)} L${pt(n-1,1)}`; for(let i=n-1;i>0;i--) d+=seg(i,i-1,1);
+    d+=` L1000,${(H+half[0]).toFixed(1)} Z`;
+    const seps=fs.slice(1).map((_,i)=>{ const x=(1000-(i+1)*1000/n).toFixed(1); return `<line x1="${x}" x2="${x}" y1="0" y2="120"/>`; }).join("");
+    funnel=spCard(`<h2>قیف تبدیل</h2><p class="sub">از نمایش تا آخرین رویداد · عدد زیر هر مرحله، نرخ تبدیل از مرحله قبل است</p>
+      <div class="sp-fun"><div class="sp-fun-in" style="--n:${n}">
+        ${fs.map(([m,l],i)=>`<div class="lab" style="grid-column:${i+1}" title="${esc(l)}: ${fa(a.s[m])}"><span>${esc(l.replace(/ \(.*\)$/,""))}</span><b>${a.s[m]>=1e6?compact(a.s[m]):fa(a.s[m])}</b></div>`).join("")}
+        <svg viewBox="0 0 1000 120" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="spFunG" x1="1" x2="0" y1="0" y2="0"><stop offset="0" stop-color="${ac}"/><stop offset="1" stop-color="${alpha(ac,.45)}"/></linearGradient></defs><path d="${d}" fill="url(#spFunG)"/><g class="sep">${seps}</g></svg>
+        ${fs.map(([m],i)=>`<div class="pc" style="grid-column:${i+1}">${i?`<i>${faPct(a.s[m]/a.s[fs[i-1][0]])}</i>`:`<i class="st">شروع</i>`}</div>`).join("")}
+      </div></div>`,"wide","",.05); }
+  out.charts=(cards.length?`<div class="sp-grid">${cards.join("")}</div>`:"")+funnel;
   /* 4. CPA report */
   if(r0&&(a.s[r0]||0)>0){ const cp=spVal(a,cpa0), withR=gs.filter(g=>spValid(g.a,cpa0)!=null), best=[...withR].sort((x,y)=>spVal(x.a,cpa0)-spVal(y.a,cpa0)), noR=gs.filter(g=>(g.a.s.cost||0)>0&&!(g.a.s[r0]||0));
     const half=Math.floor(days.length/2), cpaOf=ds=>{ const rr=ds.flatMap(d=>byDay[d]||[]); return rr.length?spVal(aggregate(rr),cpa0):null; }, h1=cpaOf(days.slice(0,half)), h2=cpaOf(days.slice(half));
