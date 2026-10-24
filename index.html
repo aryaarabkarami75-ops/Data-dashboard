@@ -2005,10 +2005,12 @@ function spDeep(c,a,recs,split,cur,ac,days,byDay){
   if(r0&&cl.length>1){ SP.draw.spResC=()=>spChart("spResC",hBar("spResC",r0,spLabel(r0),false,cl));
     cards.push(spCard(`<h2>${esc(spLabel(r0))} به تفکیک کمپین</h2><p class="sub">کمپین‌هایی که بیشترین نتیجه را آوردند</p><div class="sp-chart" style="height:${Math.max(200,cl.length*36+50)}px"><canvas id="spResC"></canvas></div>`,"","spResC",.05)); }
   /* funnel */
-  const fs=[["impressions","نمایش"],["clicks","کلیک"],["sessions","سشن"],...(r0?[[r0,spLabel(r0)]]:[])].filter(([m])=>(a.s[m]||0)>0);
+  /* every event goes in the funnel, largest first (Arya 2026-10-24: KYC and the other events further down were missing) */
+  const evAll=[...new Set([...(r0?[r0]:[]),...Object.keys(a.s).filter(e=>!NOT_EVENTS.has(e)&&e!=="sessions"&&!e.includes(">"))])].filter(e=>(a.s[e]||0)>0).sort((x,y)=>a.s[y]-a.s[x]);
+  const fs=[["impressions","نمایش"],["clicks","کلیک"],["sessions","سشن"],...evAll.map(e=>[e,spLabel(e)])].filter(([m])=>(a.s[m]||0)>0);
   if(fs.length>=3){ const top=a.s[fs[0][0]];
     cards.push(spCard(`<h2>قیف تبدیل</h2><p class="sub">از نمایش تا نتیجه، با نرخ هر مرحله</p><div class="sp-funnel">${fs.map(([m,l],i)=>{ const v=a.s[m], w=Math.max(18,Math.pow(v/top,.25)*100);
-      return (i?`<div class="rt">↓ ${faPct(v/a.s[fs[i-1][0]])} از مرحله قبل</div>`:"")+`<div class="st"><div><b>${esc(l)}</b><small>${i?faPct(v/top)+" از نمایش":""}</small></div><div><div class="bx" style="width:${w.toFixed(1)}%">${fa(v)}</div></div></div>`; }).join("")}</div>`,"","",.05)); }
+      return (i?`<div class="rt">↓ ${faPct(v/a.s[fs[i-1][0]])} از مرحله قبل</div>`:"")+`<div class="st"><div><b>${esc(l)}</b><small>${i?(v/top>=1e-4||!a.s.clicks?faPct(v/top)+" از "+fs[0][1]:faPct(v/a.s.clicks)+" از کلیک"):""}</small></div><div><div class="bx" style="width:${w.toFixed(1)}%">${fa(v)}</div></div></div>`; }).join("")}</div>`,"","",.05)); }
   out.charts=cards.length?`<div class="sp-grid">${cards.join("")}</div>`:"";
   /* 4. CPA report */
   if(r0&&(a.s[r0]||0)>0){ const cp=spVal(a,cpa0), withR=gs.filter(g=>spValid(g.a,cpa0)!=null), best=[...withR].sort((x,y)=>spVal(x.a,cpa0)-spVal(y.a,cpa0)), noR=gs.filter(g=>(g.a.s.cost||0)>0&&!(g.a.s[r0]||0));
